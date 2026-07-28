@@ -349,7 +349,14 @@
     <div id="vendorBannerWrap"></div>
 
     <div class="card">
-      <h3>최근 배치 내역</h3>
+      <h3>배치 판매 내역 <span class="count" id="vpBatchCount"></span></h3>
+      <div class="toolbar">
+        <span style="font-size:12px; color:var(--muted);">출고일:</span>
+        <input type="date" id="vpDateFrom" title="출고일 시작(일자별 조회)" />
+        <span style="color:var(--muted); font-size:12px;">~</span>
+        <input type="date" id="vpDateTo" title="출고일 종료(일자별 조회)" />
+        <button id="vpDateClear" style="border:1px solid var(--border); background:#fff; border-radius:6px; padding:6px 10px; font-size:11.5px; cursor:pointer;">날짜 초기화</button>
+      </div>
       <div class="table-scroll"><table id="vendorBatchTable"></table></div>
     </div>
 
@@ -516,6 +523,7 @@
 
   <nav class="tabs">
     <button data-tab="overview" class="active">대시보드</button>
+    <button data-tab="calendar">상품 캘린더·전략</button>
     <button data-tab="targets">목표관리</button>
     <button data-tab="category">카테고리 분석</button>
     <button data-tab="vendors">업체</button>
@@ -524,6 +532,7 @@
     <button data-tab="fulldata">전체 데이터</button>
     <button data-tab="inquiries">문의/FAQ</button>
     <button data-tab="editrequests">수정 요청 <span id="editReqBadge"></span></button>
+    <button data-tab="vendormonitor">제조사(모니터링)</button>
     <button data-tab="accounts">계정 승인 <span id="pendingAccountBadge"></span></button>
   </nav>
 
@@ -551,6 +560,7 @@
     <div class="grid2">
       <div class="card">
         <h3>월별 매출 추이 (USD) &amp; 평균 마진율</h3>
+        <div class="desc" id="revenueChartDesc"></div>
         <div class="chart-h"><canvas id="revenueChart"></canvas></div>
       </div>
       <div class="card">
@@ -562,7 +572,7 @@
     <div class="grid2">
       <div class="card">
         <h3>전월 대비(MoM) 매출 증감률</h3>
-        <div class="desc">2026년 전체 배치 데이터 기준 (조회 기간 필터와 무관하게 항상 전체 월 추이를 표시합니다)</div>
+        <div class="desc">배치(2026~) + 월별 매출(2024~2026) 데이터를 합쳐 항상 전체 기간 추이를 표시합니다 (조회 기간 필터와 무관)</div>
         <div class="chart-h"><canvas id="momChart"></canvas></div>
       </div>
       <div class="card">
@@ -592,6 +602,155 @@
     <div class="card" id="ovInsightCard3">
       <h3>판매현황 요약 인사이트 · 업체/목표</h3>
       <div id="ovInsightList3"></div>
+    </div>
+  </section>
+
+  <!-- PRODUCT CALENDAR & STRATEGY (상품 캘린더 · 전략) -->
+  <section id="panel-calendar" class="panel">
+    <div class="toolbar">
+      <span style="font-size:12.5px; color:var(--muted); font-weight:600;">연도:</span>
+      <select id="calYearSelect"></select>
+      <span class="count" id="calYearNote"></span>
+    </div>
+
+    <div class="card">
+      <h3>① 상품 운영 캘린더 (월별 매출 히트맵)</h3>
+      <div class="desc" id="calGanttDesc"></div>
+      <div class="toolbar" style="margin:8px 0;">
+        <input type="text" id="calGanttSearch" placeholder="상품명·업체 검색" style="min-width:200px; padding:6px 8px; border:1px solid var(--border); border-radius:6px; font-size:12px;" />
+        <button id="calGanttShowAllBtn" style="border:1px solid var(--border); background:#fff; border-radius:8px; padding:6px 12px; font-size:12px; cursor:pointer;">전체 보기</button>
+        <span class="count" id="calGanttCount"></span>
+      </div>
+      <div id="calGanttWrap" style="overflow-x:auto;"></div>
+    </div>
+
+    <div class="card">
+      <h3>①-2 분기별 런칭 캘린더</h3>
+      <div class="desc">구글 캘린더처럼 날짜 칸에서 바로 확인합니다. 파란색은 확정된 운영 배치, 초록색은 과거 Shopify 실매출 실적, 주황색은 아직 등록만 된 운영계획(④에서 등록)입니다 — 과거 분기는 지난 실적을, 앞으로 올 분기는 계획을 몰아넣을지 판단하는 용도로 계속 이어서 쓸 수 있습니다.</div>
+      <div class="toolbar" id="calQuarterToolbar" style="margin:8px 0;"></div>
+      <div id="miniCalWrap" style="display:grid; grid-template-columns: repeat(2, minmax(240px, 1fr)); gap:16px; margin-top:10px;"></div>
+    </div>
+
+    <div class="card">
+      <h3>② 매출 스냅샷 (선택 연도 한눈에 보기)</h3>
+      <div class="kpis" id="calKpiRow"></div>
+      <div class="grid2" style="margin-top:12px;">
+        <div>
+          <div class="desc" style="margin-bottom:6px;">상품별 매출 TOP 10 (USD)</div>
+          <div class="chart-h" style="height:240px;"><canvas id="calTopProductChart"></canvas></div>
+        </div>
+        <div>
+          <div class="desc" style="margin-bottom:6px;">전년 대비 월별 매출 (USD)</div>
+          <div class="chart-h" style="height:240px;"><canvas id="calYoyChart"></canvas></div>
+        </div>
+      </div>
+      <div style="margin-top:10px;">
+        <button id="calToggleTableBtn" style="border:1px solid var(--border); background:#fff; border-radius:8px; padding:7px 12px; font-size:12px; cursor:pointer;">전체 상품 매출표 펼치기 ▾</button>
+      </div>
+      <div id="calProductTableWrap" style="display:none; margin-top:12px;">
+        <div class="toolbar">
+          <input type="text" id="calProductSearch" placeholder="상품명·SKU·업체 검색" />
+          <span class="count" id="calProductCount"></span>
+        </div>
+        <div class="table-scroll"><table id="calProductTable"></table></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>③ 소싱·운영 시뮬레이션 — 추천 시기 &amp; 목표치</h3>
+      <div class="desc">기존에 팔던 상품은 SKU를, 아직 소싱 전인 신규 후보는 카테고리만 선택해도 됩니다 — 같은 카테고리의 과거 판매 흐름을 근거로 언제 운영하면 좋을지, 목표매출은 얼마로 잡으면 좋을지 자동으로 계산합니다.</div>
+      <div class="toolbar" style="flex-wrap:wrap;">
+        <select id="simModeSelect">
+          <option value="existing">기존 판매 이력 있는 SKU</option>
+          <option value="newsourcing">신규 소싱 후보 (카테고리 기준)</option>
+        </select>
+        <select id="simSkuSelect"><option value="">SKU 선택</option></select>
+        <select id="simCategorySelect" style="display:none;"><option value="">카테고리 선택</option></select>
+        <input type="text" id="simNewProductLabel" placeholder="예상 제품명/브랜드명(메모용, 선택)" style="display:none; min-width:160px; padding:6px 8px; border:1px solid var(--border); border-radius:6px; font-size:12px;" />
+        <button id="simRunBtn" style="border:none; background:var(--accent); color:#fff; border-radius:8px; padding:8px 14px; font-size:12.5px; font-weight:700; cursor:pointer;">시뮬레이션 실행</button>
+      </div>
+      <div id="simBrandCheckWrap" style="display:none; margin-top:8px; padding:10px 12px; background:#fff8ec; border:1px solid #f0dfba; border-radius:8px;">
+        <div style="font-size:12px; font-weight:700; color:#92400e; margin-bottom:6px;">⚠️ 신규 소싱 후보는 카테고리 전체 평균일 뿐, 이 브랜드의 실제 데이터가 아닙니다</div>
+        <div style="font-size:11.5px; color:var(--muted); margin-bottom:8px;">등록 전 스마트스토어·쿠팡·브랜드 공식몰 등 외부 사이트에서 이 브랜드의 가격대·리뷰·판매량을 직접 확인해보세요.</div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:6px;">
+          <button type="button" id="simBrandSearchBtn1" style="font-size:11.5px; border:1px solid var(--border); background:#fff; border-radius:6px; padding:5px 10px; cursor:pointer; color:var(--text);">🔍 네이버에서 브랜드명 검색</button>
+          <button type="button" id="simBrandSearchBtn2" style="font-size:11.5px; border:1px solid var(--border); background:#fff; border-radius:6px; padding:5px 10px; cursor:pointer; color:var(--text);">🔍 쿠팡에서 브랜드명 검색</button>
+        </div>
+        <div style="font-size:10.5px; color:var(--muted); margin-bottom:4px;">새 창이 안 열리거나 바로 튕기면(미리보기 환경 제한), 아래 링크를 복사해서 실제 브라우저 주소창에 붙여넣어 주세요.</div>
+        <div style="display:flex; gap:6px; align-items:center; margin-bottom:8px; flex-wrap:wrap;">
+          <input type="text" id="simBrandUrlNaver" readonly style="flex:1; min-width:180px; font-size:11px; padding:5px 7px; border:1px solid var(--border); border-radius:6px; background:#fbfaf8; color:var(--muted);" />
+          <button type="button" id="simBrandCopyBtn1" style="font-size:11px; border:1px solid var(--border); background:#fff; border-radius:6px; padding:5px 8px; cursor:pointer;">복사</button>
+        </div>
+        <div style="display:flex; gap:6px; align-items:center; margin-bottom:10px; flex-wrap:wrap;">
+          <input type="text" id="simBrandUrlCoupang" readonly style="flex:1; min-width:180px; font-size:11px; padding:5px 7px; border:1px solid var(--border); border-radius:6px; background:#fbfaf8; color:var(--muted);" />
+          <button type="button" id="simBrandCopyBtn2" style="font-size:11px; border:1px solid var(--border); background:#fff; border-radius:6px; padding:5px 8px; cursor:pointer;">복사</button>
+        </div>
+        <div style="border-top:1px dashed var(--border); padding-top:8px; margin-bottom:10px;">
+          <button type="button" id="simBrandPreviewBtn" style="font-size:12px; border:none; background:#15803d; color:#fff; border-radius:6px; padding:6px 12px; cursor:pointer; font-weight:700;">🛍️ 네이버 유사상품 미리보기</button>
+          <span id="simBrandPreviewStatus" style="font-size:11px; color:var(--muted); margin-left:6px;"></span>
+          <div id="simBrandPreviewGrid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap:8px; margin-top:8px;"></div>
+        </div>
+        <textarea id="simBrandNote" placeholder="브랜드 점검 메모 (예: 쿠팡 리뷰 800개, 평균 판매가 $32, 경쟁사 대비 프리미엄 포지션 등)" style="width:100%; min-height:52px; padding:7px 9px; border:1px solid var(--border); border-radius:6px; font-size:12px; box-sizing:border-box;"></textarea>
+        <label style="display:flex; align-items:center; gap:6px; margin-top:8px; font-size:12px; cursor:pointer;">
+          <input type="checkbox" id="simBrandChecked" /> 외부 사이트에서 이 브랜드를 직접 확인했습니다
+        </label>
+      </div>
+      <div id="simResult"></div>
+
+      <div style="margin-top:16px; padding-top:14px; border-top:1px dashed var(--border);">
+        <div class="desc" style="margin-bottom:6px;"><b>반대로 월을 먼저 정했다면:</b> 그 달에 과거 매출이 좋았던 SKU 순위를 보여드립니다.</div>
+        <div class="toolbar">
+          <select id="simMonthSelect"></select>
+          <button id="simMonthRunBtn" style="border:1px solid var(--border); background:#fff; border-radius:8px; padding:8px 12px; font-size:12px; cursor:pointer;">이 달 추천 SKU 보기</button>
+        </div>
+        <div id="simMonthResult"></div>
+        <div id="simMonthBulkWrap" style="display:none; margin-top:10px; padding:10px 12px; background:#f7f6f4; border-radius:8px;">
+          <div class="desc" style="margin-bottom:6px;">위에서 체크(IN)한 상품들을 아래 ④ 운영 일정 등록 표에 한 번에 등록합니다.</div>
+          <div class="toolbar" style="flex-wrap:wrap;">
+            <span style="font-size:12px; color:var(--muted);">등록 연도:</span>
+            <select id="simMonthBulkYear"></select>
+            <span style="font-size:12px; color:var(--muted);">주차:</span>
+            <select id="simMonthBulkWeek">
+              <option value="">미지정(월 전체)</option>
+              <option value="1">1주차(1~7일)</option>
+              <option value="2">2주차(8~14일)</option>
+              <option value="3">3주차(15~21일)</option>
+              <option value="4">4주차(22일~말일)</option>
+            </select>
+            <button id="simMonthBulkSaveBtn" style="border:none; background:var(--accent); color:#fff; border-radius:8px; padding:8px 14px; font-size:12.5px; font-weight:700; cursor:pointer;">↓ 선택 상품 전체 등록하기</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>④ 운영 일정 등록 <span class="count" id="planCount"></span></h3>
+      <div class="desc">위 ③ 시뮬레이션 결과에서 "이 결과로 등록하기"를 누르면 아래 내용이 자동으로 채워집니다. 직접 입력도 가능합니다.</div>
+      <div class="toolbar" style="flex-wrap:wrap;">
+        <select id="planTypeSelect">
+          <option value="existing">기존 운영상품</option>
+          <option value="new">신규 제품</option>
+        </select>
+        <select id="planSkuSelect" style="min-width:220px;"><option value="">SKU 선택</option></select>
+        <input type="text" id="planNewLabel" placeholder="신규 제품명 (신규 제품 선택 시)" style="display:none; min-width:180px; padding:6px 8px; border:1px solid var(--border); border-radius:6px; font-size:12px;" />
+        <select id="planVendorSelect"><option value="">업체 선택</option></select>
+        <select id="planYear"></select>
+        <select id="planMonth"></select>
+        <select id="planWeek">
+          <option value="">주차 미지정(월 전체)</option>
+          <option value="1">1주차(1~7일)</option>
+          <option value="2">2주차(8~14일)</option>
+          <option value="3">3주차(15~21일)</option>
+          <option value="4">4주차(22일~말일)</option>
+        </select>
+        <input type="number" id="planTargetRevenue" placeholder="목표매출(USD)" style="width:120px; padding:6px 8px; border:1px solid var(--border); border-radius:6px; font-size:12px;" />
+        <input type="number" id="planQty" placeholder="목표수량" style="width:100px; padding:6px 8px; border:1px solid var(--border); border-radius:6px; font-size:12px;" />
+        <button id="planAutoFillBtn" style="border:1px solid var(--border); background:#fff; border-radius:8px; padding:8px 12px; font-size:12px; cursor:pointer;">✨ 자동 추천 채우기</button>
+        <button id="planSaveBtn" style="border:none; background:var(--accent); color:#fff; border-radius:8px; padding:8px 14px; font-size:12.5px; font-weight:700; cursor:pointer;">+ 등록</button>
+      </div>
+      <div id="planBasisNote" class="desc"></div>
+      <textarea id="planNotes" placeholder="메모 (예: 브랜드 점검 내용, 특이사항)" style="width:100%; min-height:44px; margin-top:6px; padding:7px 9px; border:1px solid var(--border); border-radius:6px; font-size:12px; box-sizing:border-box;"></textarea>
+      <div class="table-scroll"><table id="planTable"></table></div>
     </div>
   </section>
 
@@ -823,6 +982,19 @@
     </div>
   </section>
 
+  <!-- VENDOR MONITORING (제조사 계정으로 가입한 업체들을 마스터 관리자가 모니터링) -->
+  <section id="panel-vendormonitor" class="panel">
+    <div class="card">
+      <h3>제조사(모니터링)</h3>
+      <div class="desc">계정 종류를 "제조사"로 해서 가입한 계정 목록입니다. 아무 행이나 클릭하면 그 업체가 포털에서 보는 매출/판매내역/문의 화면을 그대로 볼 수 있습니다.</div>
+      <div class="toolbar">
+        <input type="text" id="vmTabSearch" placeholder="아이디·업체명 검색" />
+        <span class="count" id="vmTabCount"></span>
+      </div>
+      <div class="table-scroll"><table id="vendorMonitorAccountsTable"></table></div>
+    </div>
+  </section>
+
   <!-- ACCOUNT APPROVAL -->
   <section id="panel-accounts" class="panel">
     <div class="card">
@@ -866,6 +1038,34 @@
         <button id="editModalCancel" style="border:1px solid var(--border); background:#fff; border-radius:8px; padding:8px 16px; font-size:12.5px; cursor:pointer;">취소</button>
         <button id="editModalSave" style="border:none; background:var(--accent); color:#fff; border-radius:8px; padding:8px 16px; font-size:12.5px; font-weight:700; cursor:pointer;">저장</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Vendor sales monitoring modal (관리자용 — 업체별 제조사 화면 모니터링) -->
+<div id="vendorMonitorOverlay" style="display:none; position:fixed; inset:0; background:rgba(28,26,23,0.45); z-index:60; align-items:center; justify-content:center; padding:24px;">
+  <div style="background:var(--card); border-radius:var(--radius); max-width:840px; width:100%; max-height:88vh; overflow-y:auto; padding:22px; box-shadow: var(--shadow-md);">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:14px;">
+      <h3 id="vendorMonitorTitle" style="margin:0; font-size:16px;">업체 판매 모니터링</h3>
+      <button id="vendorMonitorClose" style="border:none; background:none; font-size:18px; cursor:pointer; color:var(--muted); line-height:1;">✕</button>
+    </div>
+    <div id="vendorMonitorBannerWrap"></div>
+    <div class="chart-h" style="height:180px; margin-top:14px;"><canvas id="vendorMonitorChart"></canvas></div>
+    <div class="toolbar" style="margin-top:12px;">
+      <span style="font-size:12px; color:var(--muted);">출고일:</span>
+      <input type="date" id="vmDateFrom" title="출고일 시작(일자별 조회)" />
+      <span style="color:var(--muted); font-size:12px;">~</span>
+      <input type="date" id="vmDateTo" title="출고일 종료(일자별 조회)" />
+      <button id="vmDateClear" style="border:1px solid var(--border); background:#fff; border-radius:6px; padding:6px 10px; font-size:11.5px; cursor:pointer;">날짜 초기화</button>
+      <span class="count" id="vmCount"></span>
+    </div>
+    <div class="table-scroll"><table id="vendorMonitorTable"></table></div>
+
+    <h3 style="margin-top:20px;">이 업체의 문의 내역 (읽기 전용)</h3>
+    <div class="desc">제조사가 실제로 문의한 질문과 답변 스레드입니다. 여기서는 조회만 가능하고, 답변은 "문의/FAQ" 탭에서 해주세요.</div>
+    <div style="display:grid; grid-template-columns: 220px 1fr; gap:12px; margin-top:8px;">
+      <div id="vmInquiryList" style="max-height:280px; overflow-y:auto; border:1px solid var(--border); border-radius:10px; padding:6px;"></div>
+      <div id="vmInquiryThread" style="max-height:280px; overflow-y:auto; padding:10px; background:#b2c7d9; border-radius:10px;"></div>
     </div>
   </div>
 </div>
@@ -945,6 +1145,9 @@ function timeAgo(iso) {
 }
 
 let VENDORS = [], SKUS = [], BATCHES = [], CATHIST = [];
+let MONTHLY_SALES = [], OPERATION_PLANS = [];
+let calYear = null;
+let ganttDragData = null;
 let ovFilter = { from: null, to: null };
 const chartInstances = {};
 function makeChart(canvasId, config) {
@@ -1081,6 +1284,7 @@ const EDIT_MODAL_ACTIONS = {
   batches: { upsert: 'upsert_batch', del: 'delete_batch' },
   app_accounts: { upsert: 'update_account', del: 'delete_account' },
   product_launch_requests: { upsert: 'upsert_launch_request', del: 'delete_launch_request' },
+  product_operation_plans: { upsert: 'upsert_operation_plan', del: 'delete_operation_plan' },
 };
 
 // number 타입 필드는 <input>에서 문자열로 나오므로 서버로 보내기 전에 실제 숫자로 변환(빈 값은 null).
@@ -1285,6 +1489,24 @@ function batchFields() {
   ];
 }
 
+// 캘린더 칩(운영계획)을 클릭해 바로 수정할 수 있도록 하는 범용 편집 모달용 필드 정의.
+function planFields() {
+  return [
+    { key: 'vendor_id', label: '업체', type: 'select', options: () => [{ value: '', label: '(미지정)' }, ...VENDORS.map(v => ({ value: v.id, label: v.name }))] },
+    { key: 'sku_id', label: 'SKU (기존 상품인 경우)', type: 'select', options: () => [{ value: '', label: '(신규 제품 — 아래 제품명 입력)' }, ...SKUS.map(s => ({ value: s.id, label: `${s.name_kr} (${s.direct_ship_code || ''})` }))] },
+    { key: 'product_label', label: '신규 제품명(메모용)', type: 'text', wide: true },
+    { key: 'plan_year', label: '연도', type: 'number', required: true },
+    { key: 'plan_month', label: '월', type: 'number', required: true },
+    { key: 'planned_start', label: '예정 시작일(선택)', type: 'date' },
+    { key: 'planned_end', label: '예정 종료일(선택)', type: 'date' },
+    { key: 'planned_target_revenue_usd', label: '목표매출($)', type: 'number' },
+    { key: 'planned_qty', label: '목표수량', type: 'number' },
+    { key: 'is_new_product', label: '신규 제품 여부', type: 'checkbox' },
+    { key: 'status', label: '상태', type: 'select', options: [{ value: 'PLANNED', label: '계획' }, { value: 'CONFIRMED', label: '확정' }, { value: 'CANCELLED', label: '취소' }] },
+    { key: 'notes', label: '메모', type: 'textarea', wide: true },
+  ];
+}
+
 const LAUNCH_EDIT_FIELDS = [
   { key: 'product_name', label: '제품명(국문)', type: 'text', required: true },
   { key: 'name_en', label: '제품명(영문)', type: 'text' },
@@ -1315,7 +1537,23 @@ const ACCOUNT_EDIT_FIELDS = [
 
 // ---------------- OVERVIEW ----------------
 // ---- 기간 필터 (조회 기간 선택) ----
-function getAllPeriodKeys() { return Array.from(new Set(BATCHES.map(periodKey))).sort(); }
+// 배치(차수) 데이터는 2026년부터만 존재하므로, 조회기간 자체가 26년으로 국한되지 않도록
+// direct_ship_monthly_sales(2024~2026 Shopify 월별 매출)의 연/월도 함께 합쳐서 드롭다운을 구성한다.
+function monthlySalesPeriodKey(r) { return `${r.sale_year}-${String(r.sale_month).padStart(2, '0')}`; }
+function getAllPeriodKeys() {
+  const keys = new Set(BATCHES.map(periodKey));
+  MONTHLY_SALES.forEach(r => keys.add(monthlySalesPeriodKey(r)));
+  return Array.from(keys).sort();
+}
+// 해당 기간(key)의 매출: 배치(차수) 데이터가 있으면 배치 기준, 없으면 Shopify 월별 매출로 대체.
+// 마진율/취소·클레임/채널믹스처럼 배치에만 존재하는 값은 이 함수로 대체할 수 없다 — 그 항목들은 배치 데이터 있는 기간에서만 표시된다.
+function revenueForKey(key) {
+  const batchRows = BATCHES.filter(b => periodKey(b) === key);
+  if (batchRows.length) return { revenue: batchRows.reduce((s, b) => s + (Number(b.revenue_total_usd) || 0), 0), krw: batchRows.reduce((s, b) => s + (Number(b.revenue_total_krw) || 0), 0), source: 'batch' };
+  const [y, m] = key.split('-').map(Number);
+  const salesRows = MONTHLY_SALES.filter(r => Number(r.sale_year) === y && Number(r.sale_month) === m);
+  return { revenue: salesRows.reduce((s, r) => s + (Number(r.net_sales_usd) || 0), 0), krw: 0, source: salesRows.length ? 'sales' : 'none' };
+}
 
 function populateOvPeriodSelects() {
   const keys = getAllPeriodKeys();
@@ -1375,39 +1613,70 @@ function renderOverview() {
   wireOvPeriodControls();
   const keys = getAllPeriodKeys();
   const filtered = filteredBatchesForPeriod();
+  const periodRange = keys.filter(k => k >= ovFilter.from && k <= ovFilter.to);
   if (ovFilter.from === keys[0] && ovFilter.to === keys[keys.length - 1]) setActivePreset('all');
+
+  const revByKey = periodRange.map(k => ({ key: k, ...revenueForKey(k) }));
+  const totalUsd = revByKey.reduce((s, r) => s + r.revenue, 0);
+  const totalKrw = revByKey.reduce((s, r) => s + r.krw, 0);
+  const hasNonBatch = revByKey.some(r => r.source !== 'batch');
+
   document.getElementById('ovPeriodLabel').textContent = keys.length
-    ? `${filtered.length}건의 배치 · ${labelForKey(ovFilter.from)} ~ ${labelForKey(ovFilter.to)}`
+    ? `${filtered.length}건의 배치(2026~) · ${labelForKey(ovFilter.from)} ~ ${labelForKey(ovFilter.to)}${hasNonBatch ? ' · 이전 기간은 Shopify 월매출로 보완' : ''}`
     : '';
 
-  const totalUsd = filtered.reduce((s, b) => s + (Number(b.revenue_total_usd) || 0), 0);
-  const totalKrw = filtered.reduce((s, b) => s + (Number(b.revenue_total_krw) || 0), 0);
   const marginVals = filtered.map(b => b.margin_rate).filter(v => v !== null && v !== undefined);
   const avgMargin = marginVals.length ? marginVals.reduce((s, v) => s + Number(v), 0) / marginVals.length : null;
   const activeVendors = VENDORS.filter(v => v.status === 'CONTINUE').length;
 
   document.getElementById('kpiRow').innerHTML = `
-    <div class="kpi"><div class="label">총 매출 (선택 기간, USD)</div><div class="value">${fmtUsd(totalUsd)}</div><div class="sub">${fmtKrw(totalKrw)}</div></div>
-    <div class="kpi"><div class="label">평균 마진율</div><div class="value ${marginClass(avgMargin)}">${fmtPct(avgMargin)}</div><div class="sub">배치 ${marginVals.length}건 기준</div></div>
+    <div class="kpi"><div class="label">총 매출 (선택 기간, USD)</div><div class="value">${fmtUsd(totalUsd)}</div><div class="sub">${hasNonBatch ? '배치+Shopify 월매출 합산' : fmtKrw(totalKrw)}</div></div>
+    <div class="kpi"><div class="label">평균 마진율</div><div class="value ${marginClass(avgMargin)}">${fmtPct(avgMargin)}</div><div class="sub">배치 ${marginVals.length}건 기준 (2026~만 존재)</div></div>
     <div class="kpi"><div class="label">배치(차수) 수</div><div class="value">${filtered.length}</div><div class="sub">${labelForKey(ovFilter.from)} ~ ${labelForKey(ovFilter.to)}</div></div>
     <div class="kpi"><div class="label">진행중 업체</div><div class="value">${activeVendors}</div><div class="sub">전체 ${VENDORS.length}개 중</div></div>
   `;
 
-  const byMonth = {};
+  // 마진율은 배치(2026~)에만 존재하는 실측값이라, 배치 없는 과거 기간은 SKU 마스터의 마진율(online_margin_rate/store_margin_rate)을
+  // 그 달 Shopify 매출 비중으로 가중평균해 "추정치"로 보완한다 (실측과 명확히 구분해서 별도 선으로 표시).
+  const marginByKey = {};
   filtered.forEach(b => {
-    const key = b.month;
-    if (!byMonth[key]) byMonth[key] = { revenue: 0, marginSum: 0, marginN: 0 };
-    byMonth[key].revenue += Number(b.revenue_total_usd) || 0;
-    if (b.margin_rate !== null && b.margin_rate !== undefined) { byMonth[key].marginSum += Number(b.margin_rate); byMonth[key].marginN += 1; }
+    const k = periodKey(b);
+    if (!marginByKey[k]) marginByKey[k] = { sum: 0, n: 0 };
+    if (b.margin_rate !== null && b.margin_rate !== undefined) { marginByKey[k].sum += Number(b.margin_rate); marginByKey[k].n += 1; }
   });
-  const months = Object.keys(byMonth).map(Number).sort((a,b) => a-b);
-  const revData = months.map(m => Math.round(byMonth[m].revenue));
-  const marginData = months.map(m => byMonth[m].marginN ? (byMonth[m].marginSum / byMonth[m].marginN * 100) : null);
+  const skuMarginByTitle = {};
+  SKUS.forEach(s => {
+    const m = s.online_margin_rate !== null && s.online_margin_rate !== undefined ? Number(s.online_margin_rate) : (s.store_margin_rate !== null && s.store_margin_rate !== undefined ? Number(s.store_margin_rate) : null);
+    if (m !== null && !isNaN(m)) skuMarginByTitle[s.name_kr] = m;
+  });
+  function estimatedMarginForKey(key) {
+    const [y, m] = key.split('-').map(Number);
+    const rows = MONTHLY_SALES.filter(r => Number(r.sale_year) === y && Number(r.sale_month) === m);
+    let weightedSum = 0, weightTotal = 0;
+    rows.forEach(r => {
+      const margin = skuMarginByTitle[r.product_title];
+      const rev = Number(r.net_sales_usd) || 0;
+      if (margin !== undefined && rev > 0) { weightedSum += margin * rev; weightTotal += rev; }
+    });
+    return weightTotal ? (weightedSum / weightTotal * 100) : null;
+  }
+
+  const revData = revByKey.map(r => Math.round(r.revenue));
+  const marginData = revByKey.map(r => (marginByKey[r.key] && marginByKey[r.key].n) ? (marginByKey[r.key].sum / marginByKey[r.key].n * 100) : null);
+  const marginEstData = revByKey.map(r => (marginByKey[r.key] && marginByKey[r.key].n) ? null : estimatedMarginForKey(r.key));
+  const barColors = revByKey.map(r => r.source === 'batch' ? '#b45309cc' : '#93c5fd');
+  const hasEstMargin = marginEstData.some(v => v !== null);
+
+  const descEl = document.getElementById('revenueChartDesc');
+  if (descEl) descEl.textContent = hasNonBatch
+    ? `진한 막대=배치(차수) 실데이터, 옅은 막대=Shopify 월매출로 보완한 값(2026년 이전) · 실선 마진율=배치 실측, ${hasEstMargin ? '점선 마진율=SKU 기준 마진율을 그 달 매출비중으로 가중평균한 추정치입니다.' : '배치 없는 달은 마진율 추정에 쓸 SKU 매칭 데이터가 부족합니다.'}`
+    : '배치(차수) 데이터 기준입니다.';
 
   makeChart('revenueChart', {
-    data: { labels: months.map(m => m + '월'), datasets: [
-      { type: 'bar', label: '매출(USD)', data: revData, backgroundColor: '#b45309aa', yAxisID: 'y' },
-      { type: 'line', label: '평균 마진율(%)', data: marginData, borderColor: '#2563eb', backgroundColor: '#2563eb', yAxisID: 'y1', tension: 0.3 }
+    data: { labels: periodRange.map(labelForKey), datasets: [
+      { type: 'bar', label: '매출(USD)', data: revData, backgroundColor: barColors, yAxisID: 'y' },
+      { type: 'line', label: '평균 마진율(%) - 실측', data: marginData, borderColor: '#2563eb', backgroundColor: '#2563eb', yAxisID: 'y1', tension: 0.3, spanGaps: false },
+      { type: 'line', label: '평균 마진율(%) - 추정(SKU 기준)', data: marginEstData, borderColor: '#9333ea', backgroundColor: '#9333ea', yAxisID: 'y1', tension: 0.3, spanGaps: false, borderDash: [5, 4], pointStyle: 'rectRot' }
     ]},
     options: { responsive: true, maintainAspectRatio: false, scales: {
       y: { beginAtZero: true, position: 'left', title: { display: true, text: 'USD' } },
@@ -1441,11 +1710,10 @@ function renderOverview() {
   renderOverviewInsights(filtered, keys);
 }
 
-// ---- 전월대비(MoM) 매출 증감률: 항상 전체 월 기준(기간 필터와 무관) ----
+// ---- 전월대비(MoM) 매출 증감률: 항상 전체 월 기준(기간 필터와 무관) — 배치+Shopify 월매출 합산 ----
 function renderMomChart() {
-  const byMonth = {};
-  BATCHES.forEach(b => { const k = periodKey(b); byMonth[k] = (byMonth[k] || 0) + (Number(b.revenue_total_usd) || 0); });
-  const keys = Object.keys(byMonth).sort();
+  const keys = getAllPeriodKeys();
+  const byMonth = {}; keys.forEach(k => { byMonth[k] = revenueForKey(k).revenue; });
   const momPct = keys.map((k, i) => { if (i === 0) return null; const prev = byMonth[keys[i-1]]; return prev ? ((byMonth[k]-prev)/prev*100) : null; });
   const colors = momPct.map(v => v === null ? '#d4d4d8' : (v >= 0 ? '#15803d' : '#b91c1c'));
   makeChart('momChart', {
@@ -1459,7 +1727,8 @@ function renderMomChart() {
 function renderYoyChart() {
   const histYears = Array.from(new Set(CATHIST.map(r => Number(r.year))));
   const batchYears = Array.from(new Set(BATCHES.map(b => Number(b.year))));
-  const allYears = Array.from(new Set([...histYears, ...batchYears]));
+  const salesYears = Array.from(new Set(MONTHLY_SALES.map(r => Number(r.sale_year))));
+  const allYears = Array.from(new Set([...histYears, ...batchYears, ...salesYears]));
   if (!allYears.length) return;
   const maxYear = Math.max(...allYears);
   const yearWindow = [maxYear - 2, maxYear - 1, maxYear];
@@ -1472,6 +1741,11 @@ function renderYoyChart() {
     const arr = byYearMonth[y];
     arr[r.month - 1] = (arr[r.month - 1] || 0) + (Number(r.revenue_usd) || 0);
   });
+  // CATHIST(카테고리 매출 이력)가 없는 연도는 Shopify 월별 매출(direct_ship_monthly_sales)로 대체 — 2024~2025년도 비교에 나오도록.
+  yearWindow.forEach(y => {
+    if (byYearMonth[y].some(v => v !== null)) return;
+    MONTHLY_SALES.forEach(r => { if (Number(r.sale_year) === y) byYearMonth[y][Number(r.sale_month) - 1] = (byYearMonth[y][Number(r.sale_month) - 1] || 0) + (Number(r.net_sales_usd) || 0); });
+  });
   const liveByMonth = {};
   BATCHES.forEach(b => { if (Number(b.year) === maxYear) liveByMonth[b.month] = (liveByMonth[b.month] || 0) + (Number(b.revenue_total_usd) || 0); });
   Object.keys(liveByMonth).forEach(m => { byYearMonth[maxYear][Number(m) - 1] = liveByMonth[m]; });
@@ -1479,17 +1753,23 @@ function renderYoyChart() {
   const monthLabels = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
   const palette = {}; palette[yearWindow[0]] = '#9ca3af'; palette[yearWindow[1]] = '#2563eb'; palette[yearWindow[2]] = '#b45309';
   const missingYears = yearWindow.filter(y => byYearMonth[y].every(v => v === null));
+  // Shopify 월별매출로 대체한 연도 중, 현재 SKU 마스터와 매칭된 상품 수가 적어(예: 2024년) 실제보다 낮게 보일 수 있는 연도를 표시.
+  const skuMatchCountByYear = {};
+  MONTHLY_SALES.forEach(r => { const y = Number(r.sale_year); const s = new Set(skuMatchCountByYear[y] || []); s.add(r.sku || r.product_title); skuMatchCountByYear[y] = s; });
+  const partialYears = yearWindow.filter(y => !missingYears.includes(y) && !histYears.includes(y) && (skuMatchCountByYear[y] ? skuMatchCountByYear[y].size : 0) < 30);
   const datasets = yearWindow.map(y => ({
-    label: y + '년' + (missingYears.includes(y) ? ' (데이터 없음)' : ''),
+    label: y + '년' + (missingYears.includes(y) ? ' (데이터 없음)' : (partialYears.includes(y) ? ' (일부 상품만 매칭됨·과소표시 가능)' : '')),
     data: byYearMonth[y].map(v => v === null ? null : Math.round(v)),
     borderColor: palette[y], backgroundColor: palette[y], tension: 0.3, spanGaps: false
   }));
   makeChart('yoyChart', { type: 'line', data: { labels: monthLabels, datasets }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, title: { display: true, text: 'USD' } } } } });
 
   const availableYears = yearWindow.filter(y => !missingYears.includes(y));
-  document.getElementById('yoyDataNote').textContent = missingYears.length
-    ? `현재 보유한 데이터는 ${availableYears.join(', ')}년입니다. ${missingYears.join(', ')}년 데이터가 누적되면 자동으로 3개년 비교가 완성됩니다.`
-    : `${yearWindow.join(', ')}년 최근 3개년 매출을 비교합니다.`;
+  const noteParts = [];
+  if (missingYears.length) noteParts.push(`현재 보유한 데이터는 ${availableYears.join(', ')}년입니다. ${missingYears.join(', ')}년 데이터가 누적되면 자동으로 3개년 비교가 완성됩니다.`);
+  else noteParts.push(`${yearWindow.join(', ')}년 최근 3개년 매출을 비교합니다.`);
+  if (partialYears.length) noteParts.push(`${partialYears.join(', ')}년은 현재 SKU 마스터와 매칭된 일부 상품만 반영되어 있어(단종/개편된 상품 제외) 실제보다 낮게 보일 수 있습니다.`);
+  document.getElementById('yoyDataNote').textContent = noteParts.join(' ');
 }
 
 function renderCancelClaimChart(filtered) {
@@ -1729,6 +2009,1075 @@ function renderCategory() {
 }
 
 // ---------------- VENDORS ----------------
+// ---------------- 상품 캘린더 · 전략 (PRODUCT CALENDAR & STRATEGY) ----------------
+function renderCalendarTab() {
+  populateCalYearSelect();
+  renderGantt();
+  renderMiniCalendars();
+  renderCalSnapshot();
+  populateSimControls();
+  populatePlanForm();
+  renderPlanTable();
+}
+
+function populateCalYearSelect() {
+  const sel = document.getElementById('calYearSelect');
+  const years = new Set();
+  BATCHES.forEach(b => years.add(Number(b.year)));
+  MONTHLY_SALES.forEach(r => years.add(Number(r.sale_year)));
+  const yearList = Array.from(years).sort((a, b) => b - a);
+  if (!yearList.length) yearList.push(new Date().getFullYear());
+  if (!sel.dataset.bound) {
+    sel.innerHTML = yearList.map(y => `<option value="${y}">${y}년</option>`).join('');
+    calYear = yearList[0];
+    sel.value = calYear;
+    sel.addEventListener('change', () => { calYear = Number(sel.value); renderGantt(); renderMiniCalendars(); renderCalSnapshot(); });
+    sel.dataset.bound = '1';
+  } else {
+    calYear = Number(sel.value);
+  }
+}
+
+let ganttAllRows = [];
+let ganttApproximate = false;
+let ganttSearchQuery = '';
+let ganttShowAll = false;
+
+function renderGantt() {
+  const wrap = document.getElementById('calGanttWrap');
+  const desc = document.getElementById('calGanttDesc');
+  const yearBatches = BATCHES.filter(b => Number(b.year) === calYear);
+  const vendorByName = {}; VENDORS.forEach(v => vendorByName[v.name] = v);
+
+  // 상품(타이틀) 기준 월별 실매출 맵 — 배치(차수) 등록 여부와 무관하게 Shopify 월별 매출을 그대로 사용해 히트맵을 그린다.
+  const monthlyByTitle = {};
+  MONTHLY_SALES.filter(r => Number(r.sale_year) === calYear).forEach(r => {
+    const key = r.product_title;
+    if (!monthlyByTitle[key]) monthlyByTitle[key] = Array(12).fill(0);
+    monthlyByTitle[key][Number(r.sale_month) - 1] += Number(r.net_sales_usd) || 0;
+  });
+
+  let rows = [];
+  let approximate = false;
+
+  if (yearBatches.length) {
+    rows = yearBatches.filter(b => b.period_start || b.ship_date).map(b => {
+      const start = b.period_start || b.ship_date;
+      const end = b.period_end || b.ship_date;
+      const v = vendorByName[b.vendor_name] || {};
+      const label = b.product_summary || b.batch_label;
+      return {
+        id: b.id, category: v.category || '기타', label, vendor: b.vendor_name,
+        start, end, manager: v.sales_contact1_name || '-',
+        issue: (Number(b.cancel_count) || 0) + (Number(b.claim_count) || 0), revenue: Number(b.revenue_total_usd) || 0,
+        monthly: monthlyByTitle[label] || null,
+      };
+    });
+  } else {
+    approximate = true;
+    const skuByName = {}; SKUS.forEach(s => skuByName[s.name_kr] = s);
+    rows = Object.entries(monthlyByTitle).map(([title, monthly]) => {
+      const totalRevenue = monthly.reduce((a, b) => a + b, 0);
+      const salesRow = MONTHLY_SALES.find(r => r.product_title === title && Number(r.sale_year) === calYear);
+      const sku = skuByName[title];
+      const vd = vendorByName[(salesRow && salesRow.vendor_name) || ''] || {};
+      return {
+        category: (sku && sku.category) || '기타', label: title, vendor: salesRow ? salesRow.vendor_name : '-',
+        manager: vd.sales_contact1_name || '-', issue: 0, revenue: totalRevenue, monthly,
+      };
+    }).sort((a, b) => b.revenue - a.revenue);
+  }
+
+  ganttAllRows = rows;
+  ganttApproximate = approximate;
+
+  desc.textContent = approximate
+    ? `${calYear}년은 상세 배치(차수) 데이터가 없어, Shopify 월별 실매출을 그대로 히트맵으로 보여줍니다 (색이 진할수록 그 달 매출이 높았던 상품).`
+    : `${calYear}년 배치(차수) 운영기간과 Shopify 월별 실매출을 함께 표시합니다 · 진한 칸=운영중(드래그로 일정 이동 가능), 옅은 음영=그 달의 실제 매출 규모.`;
+
+  wireGanttToolbar();
+  drawGanttTable();
+}
+
+function wireGanttToolbar() {
+  const search = document.getElementById('calGanttSearch');
+  const showAllBtn = document.getElementById('calGanttShowAllBtn');
+  if (search.dataset.bound) return;
+  search.addEventListener('input', () => { ganttSearchQuery = search.value.trim().toLowerCase(); drawGanttTable(); });
+  showAllBtn.addEventListener('click', () => {
+    ganttShowAll = !ganttShowAll;
+    showAllBtn.textContent = ganttShowAll ? '상위 20개만 보기' : '전체 보기';
+    drawGanttTable();
+  });
+  search.dataset.bound = '1';
+}
+
+function drawGanttTable() {
+  const wrap = document.getElementById('calGanttWrap');
+  const countEl = document.getElementById('calGanttCount');
+  const approximate = ganttApproximate;
+  let rows = ganttAllRows;
+  if (ganttSearchQuery) {
+    rows = rows.filter(r => (r.label || '').toLowerCase().includes(ganttSearchQuery) || (r.vendor || '').toLowerCase().includes(ganttSearchQuery));
+  }
+  const totalCount = rows.length;
+  if (!ganttShowAll) rows = rows.slice(0, 20);
+  if (countEl) countEl.textContent = `${rows.length} / ${totalCount}개 표시${!ganttShowAll && totalCount > 20 ? ' (매출 상위 20개)' : ''}`;
+
+  if (!rows.length) { wrap.innerHTML = '<div class="empty" style="padding:16px 4px;">표시할 데이터가 없습니다.</div>'; return; }
+
+  const monthLabels = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
+  const today = new Date();
+  let html = '<table style="border-collapse:collapse; width:100%; min-width:920px; font-size:11.5px;"><thead><tr>' +
+    '<th style="text-align:left; padding:6px 8px; border-bottom:1px solid var(--border); white-space:nowrap;">구분</th>' +
+    '<th style="text-align:left; padding:6px 8px; border-bottom:1px solid var(--border); white-space:nowrap;">상품명</th>' +
+    '<th style="text-align:left; padding:6px 8px; border-bottom:1px solid var(--border); white-space:nowrap;">거래처</th>' +
+    '<th style="text-align:right; padding:6px 8px; border-bottom:1px solid var(--border); white-space:nowrap;">연매출</th>' +
+    '<th style="text-align:center; padding:6px 8px; border-bottom:1px solid var(--border); white-space:nowrap;">이슈</th>' +
+    monthLabels.map(m => `<th style="text-align:center; padding:6px 3px; border-bottom:1px solid var(--border); font-weight:500; color:var(--muted);">${m}</th>`).join('') +
+    '</tr></thead><tbody>';
+
+  rows.forEach((r, rowIdx) => {
+    const monthly = r.monthly || Array(12).fill(0);
+    const rowMax = Math.max(...monthly, 1);
+    let startMonth = null, endMonth = null;
+    if (!approximate && r.start) {
+      const s = new Date(r.start), e = new Date(r.end || r.start);
+      startMonth = s.getMonth() + 1; endMonth = Math.max(startMonth, e.getMonth() + 1);
+    }
+    const totalMs = (!approximate && r.start) ? Math.max(1, new Date(r.end || r.start) - new Date(r.start)) : 1;
+    const s0 = (!approximate && r.start) ? new Date(r.start) : null;
+    const e0 = (!approximate && r.end) ? new Date(r.end) : s0;
+    let progress = 0;
+    if (s0 && today >= s0 && today <= e0) progress = Math.round(((today - s0) / totalMs) * 100);
+    else if (s0 && today > e0) progress = 100;
+    const centerMonth = startMonth ? Math.round((startMonth + endMonth) / 2) : null;
+    const rowBg = rowIdx % 2 === 1 ? '#fbfaf8' : '#ffffff';
+    html += `<tr style="background:${rowBg};">
+      <td style="padding:6px 8px; border-bottom:1px solid #f1f1f1; color:var(--muted); white-space:nowrap;">${esc(r.category)}</td>
+      <td style="padding:6px 8px; border-bottom:1px solid #f1f1f1; font-weight:600; white-space:nowrap;">${esc(r.label)}</td>
+      <td style="padding:6px 8px; border-bottom:1px solid #f1f1f1; white-space:nowrap;">${esc(r.vendor || '-')}</td>
+      <td style="padding:6px 8px; border-bottom:1px solid #f1f1f1; text-align:right; white-space:nowrap;">${fmtUsd(r.revenue)}</td>
+      <td style="padding:6px 8px; border-bottom:1px solid #f1f1f1; text-align:center;">${r.issue ? `<span style="color:#b91c1c; font-weight:700;">${r.issue}</span>` : '-'}</td>`;
+    for (let m = 1; m <= 12; m++) {
+      const rev = monthly[m - 1] || 0;
+      const isOperating = startMonth !== null && m >= startMonth && m <= endMonth;
+      const intensity = rev > 0 ? Math.min(1, rev / rowMax) : 0;
+      const heatAlpha = rev > 0 ? (0.12 + 0.66 * intensity) : 0.04;
+      const cellBg = `rgba(37,99,235,${heatAlpha})`;
+      const showRevLabel = rev > 0 && rev === rowMax;
+      const draggableAttrs = (isOperating && r.id) ? `draggable="true" data-batch-id="${r.id}" data-start-month="${startMonth}"` : '';
+      const cursorStyle = (isOperating && r.id) ? 'cursor:grab;' : '';
+      const ring = isOperating ? 'box-shadow:inset 0 0 0 1.5px #1d4ed8;' : '';
+      let inner = '';
+      if (isOperating && centerMonth === m) {
+        inner = approximate ? '' : `<span style="color:#1d4ed8; font-weight:800;">${progress}%</span>`;
+      } else if (showRevLabel) {
+        inner = `<span style="color:#1d4ed8; font-weight:700;">${fmtUsd(rev)}</span>`;
+      }
+      const tooltip = `${esc(r.label)} · ${monthLabels[m - 1]} 매출 ${fmtUsd(rev)}${isOperating ? ' · 운영중' : ''}${(isOperating && r.id) ? ' · 드래그해서 일정 이동' : ''}`;
+      html += `<td data-month="${m}" style="padding:3px 2px; border-bottom:1px solid #f1f1f1;"><div ${draggableAttrs} title="${tooltip}" style="height:22px; border-radius:4px; background:${cellBg}; ${ring} display:flex; align-items:center; justify-content:center; font-size:9px; white-space:nowrap; overflow:hidden; ${cursorStyle}">${inner}</div></td>`;
+    }
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+  wireGanttDragDrop(wrap);
+}
+
+// 간트차트 막대를 다른 달로 드래그하면 그 배치의 일정(period_start/end, 출고일 등)을 같은 개월 수만큼 이동시킨다.
+function wireGanttDragDrop(wrap) {
+  if (wrap.dataset.dndBound) return;
+  wrap.addEventListener('dragstart', (e) => {
+    const bar = e.target.closest('[data-batch-id]');
+    if (!bar) return;
+    ganttDragData = { batchId: bar.dataset.batchId, startMonth: Number(bar.dataset.startMonth) };
+    if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+  });
+  wrap.addEventListener('dragover', (e) => {
+    if (!ganttDragData) return;
+    const cell = e.target.closest('td[data-month]');
+    if (!cell) return;
+    e.preventDefault();
+  });
+  wrap.addEventListener('drop', async (e) => {
+    const cell = e.target.closest('td[data-month]');
+    if (!cell || !ganttDragData) return;
+    e.preventDefault();
+    const targetMonth = Number(cell.dataset.month);
+    const delta = targetMonth - ganttDragData.startMonth;
+    const batchId = ganttDragData.batchId;
+    ganttDragData = null;
+    if (!delta) return;
+    await shiftBatchMonths(batchId, delta);
+  });
+  wrap.dataset.dndBound = '1';
+}
+
+async function shiftBatchMonths(batchId, deltaMonths) {
+  const res = await callApi('get_batch_full', { id: batchId });
+  const full = res && res.row;
+  if (!full) return;
+  const fields = {};
+  ['period_start', 'period_end', 'ship_date', 'deadline_date', 'payment_date'].forEach(k => {
+    if (full[k]) {
+      const d = new Date(full[k]);
+      d.setMonth(d.getMonth() + deltaMonths);
+      fields[k] = d.toISOString().slice(0, 10);
+    }
+  });
+  await callApi('upsert_batch', { id: batchId, fields });
+  const { rows } = await callApi('list_batches');
+  BATCHES = rows || [];
+  renderGantt();
+  renderMiniCalendars();
+  renderCalSnapshot();
+}
+
+// ①-2 하반기(9~12월) 런칭 캘린더: 구글 캘린더 스타일 월간 그리드로 배치/운영계획을 날짜에 얹어 보여준다.
+// 분기(1~4) 단위로 계속 넘겨가며 쓸 수 있도록 — 과거 분기는 실적을, 미래 분기는 계획을 보여준다.
+let calQuarter = Math.ceil((new Date().getMonth() + 1) / 3);
+
+function quarterMonths(q) { const start = (q - 1) * 3 + 1; return [start, start + 1, start + 2]; }
+
+function renderMiniCalendars() {
+  const wrap = document.getElementById('miniCalWrap');
+  const toolbar = document.getElementById('calQuarterToolbar');
+  if (!wrap) return;
+  const year = calYear || new Date().getFullYear();
+
+  if (toolbar) {
+    toolbar.innerHTML = [1, 2, 3, 4].map(q => {
+      const active = q === calQuarter;
+      return `<button class="calQuarterBtn" data-q="${q}" style="border:1px solid var(--border); background:${active ? 'var(--accent)' : '#fff'}; color:${active ? '#fff' : 'var(--text)'}; border-radius:8px; padding:6px 12px; font-size:12px; font-weight:${active ? 700 : 400}; cursor:pointer;">${q}분기 (${quarterMonths(q)[0]}~${quarterMonths(q)[2]}월)</button>`;
+    }).join('');
+    if (!toolbar.dataset.bound) {
+      toolbar.addEventListener('click', (e) => {
+        const btn = e.target.closest('.calQuarterBtn');
+        if (!btn) return;
+        calQuarter = Number(btn.dataset.q);
+        renderMiniCalendars();
+      });
+      toolbar.dataset.bound = '1';
+    }
+  }
+
+  const months = quarterMonths(calQuarter);
+  wrap.innerHTML = months.map(m => buildMonthCalendarHtml(year, m)).join('');
+  if (!wrap.dataset.bound) {
+    wrap.addEventListener('click', (e) => {
+      const addBtn = e.target.closest('.miniCalAddBtn');
+      if (addBtn) { quickAddPlanForMonth(Number(addBtn.dataset.year), Number(addBtn.dataset.month)); return; }
+      const chip = e.target.closest('.calEventChip');
+      if (chip && chip.dataset.id) { openCalendarChipEdit(chip.dataset.type, chip.dataset.id); return; }
+    });
+    wrap.dataset.bound = '1';
+  }
+}
+
+// 캘린더 칩(배치/운영계획)을 클릭하면 기존 범용 편집 모달을 그대로 재사용해 바로 수정할 수 있게 한다.
+async function openCalendarChipEdit(type, id) {
+  if (type === 'batch') {
+    const res = await callApi('get_batch_full', { id });
+    const full = res && res.row;
+    if (!full) return;
+    openEditModal({
+      title: '배치 수정 — ' + (full.batch_label || ''), table: 'batches', idField: 'id', row: full, fields: batchFields(),
+      onSaved: async () => {
+        const { rows } = await callApi('list_batches');
+        BATCHES = rows || [];
+        renderGantt(); renderMiniCalendars(); renderCalSnapshot();
+      },
+    });
+  } else if (type === 'plan') {
+    const row = OPERATION_PLANS.find(p => String(p.id) === String(id));
+    if (!row) return;
+    openEditModal({
+      title: '운영계획 수정 — ' + (row.is_new_product ? row.product_label : (row.sku_name || row.product_label)), table: 'product_operation_plans', idField: 'id', row, fields: planFields(),
+      onSaved: async () => {
+        const { rows } = await callApi('list_operation_plans');
+        OPERATION_PLANS = rows || [];
+        renderPlanTable(); renderMiniCalendars();
+      },
+    });
+  }
+}
+
+function buildMonthCalendarHtml(year, month) {
+  // day -> [{label, color, tooltip, meta}]  (day === null 인 항목은 "일자 미지정" 배너로 상단에 별도 표시, meta 없으면(=Shopify 실적) 클릭 편집 불가)
+  const byDay = {};
+  const banners = [];
+  const push = (day, label, color, tooltip, meta) => {
+    if (day) { (byDay[day] = byDay[day] || []).push({ label, color, tooltip, meta }); }
+    else { banners.push({ label, color, tooltip, meta }); }
+  };
+
+  const batchRows = BATCHES.filter(b => Number(b.year) === year && Number(b.month) === month);
+  batchRows.forEach(b => {
+    const d = b.ship_date ? new Date(b.ship_date) : (b.period_start ? new Date(b.period_start) : null);
+    const day = (d && d.getFullYear() === year && d.getMonth() + 1 === month) ? d.getDate() : null;
+    push(day, b.product_summary || b.batch_label || '배치', '#2563eb', `[확정] ${b.product_summary || b.batch_label} · ${fmtUsd(Number(b.revenue_total_usd) || 0)} · 클릭해서 수정`, { type: 'batch', id: b.id });
+  });
+
+  // 이전에 진행했던 달(배치 데이터가 없는 과거 월)은 Shopify 월별 매출(direct_ship_monthly_sales)에서 실적을 불러와 채운다 — "이전 자료 불러오기".
+  if (!batchRows.length) {
+    const salesRows = MONTHLY_SALES.filter(r => Number(r.sale_year) === year && Number(r.sale_month) === month);
+    const byProduct = {};
+    salesRows.forEach(r => { const key = r.product_title; byProduct[key] = (byProduct[key] || 0) + (Number(r.net_sales_usd) || 0); });
+    const top = Object.entries(byProduct).sort((a, b) => b[1] - a[1]).slice(0, 6);
+    top.forEach(([title, revenue]) => push(null, title, '#15803d', `[실적] ${title} · ${fmtUsd(revenue)} (Shopify 월매출 · 집계값이라 수정 불가)`, null));
+  }
+
+  OPERATION_PLANS.filter(p => Number(p.plan_year) === year && Number(p.plan_month) === month).forEach(p => {
+    const label = p.is_new_product ? `${p.product_label || '신규'} (신규)` : (p.sku_name || p.product_label || '계획');
+    // 일자(planned_start)가 지정돼 있으면 해당 날짜 칸에, 없으면 기존처럼 상단 배너로 표시.
+    const d = p.planned_start ? new Date(p.planned_start + 'T00:00:00') : null;
+    const day = (d && d.getFullYear() === year && d.getMonth() + 1 === month) ? d.getDate() : null;
+    const dateNote = p.planned_start ? ` · ${p.planned_start.slice(5)}${p.planned_end && p.planned_end !== p.planned_start ? '~' + p.planned_end.slice(5) : ''}` : '';
+    push(day, label, '#f59e0b', `[계획] ${label} · 목표 ${fmtUsd(p.planned_target_revenue_usd)}${dateNote} · 클릭해서 수정`, { type: 'plan', id: p.id });
+  });
+
+  const first = new Date(year, month - 1, 1);
+  const startWeekday = first.getDay();
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const dowLabels = ['일', '월', '화', '수', '목', '금', '토'];
+  const today = new Date();
+  const isTodayCell = (d) => today.getFullYear() === year && today.getMonth() + 1 === month && today.getDate() === d;
+  const chipHtml = (e) => {
+    const clickable = !!e.meta;
+    const attrs = clickable ? `class="calEventChip" data-type="${e.meta.type}" data-id="${esc(String(e.meta.id))}" style="cursor:pointer;` : `style="`;
+    return `<div title="${esc(e.tooltip)}" ${attrs}background:${e.color}20; color:${e.color}; border-radius:4px; padding:1px 4px; font-size:9px; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(e.label)}</div>`;
+  };
+
+  let cellsHtml = '';
+  for (let i = 0; i < startWeekday; i++) cellsHtml += '<div style="min-height:58px; background:#fbfaf8; border-radius:4px;"></div>';
+  for (let d = 1; d <= daysInMonth; d++) {
+    const evs = byDay[d] || [];
+    const shown = evs.slice(0, 2);
+    const chips = shown.map(chipHtml).join('');
+    const more = evs.length > shown.length ? `<div style="font-size:9px; color:var(--muted);">+${evs.length - shown.length}건 더</div>` : '';
+    const todayRing = isTodayCell(d) ? 'box-shadow:inset 0 0 0 1.5px var(--accent);' : '';
+    cellsHtml += `<div style="min-height:58px; border:1px solid #f1f1f1; border-radius:4px; padding:3px; background:${evs.length ? '#fffdf7' : '#fff'}; ${todayRing}">
+      <div style="font-size:10px; color:var(--muted); font-weight:${isTodayCell(d) ? 700 : 400};">${d}</div>
+      ${chips}${more}
+    </div>`;
+  }
+  const trailing = (startWeekday + daysInMonth) % 7;
+  if (trailing) for (let i = trailing; i < 7; i++) cellsHtml += '<div style="min-height:58px; background:#fbfaf8; border-radius:4px;"></div>';
+
+  const bannerHtml = banners.length
+    ? `<div style="margin-bottom:6px; display:flex; flex-wrap:wrap; gap:4px;">${banners.map(b => {
+        const clickable = !!b.meta;
+        const attrs = clickable ? `class="calEventChip" data-type="${b.meta.type}" data-id="${esc(String(b.meta.id))}" style="cursor:pointer;` : `style="`;
+        return `<div title="${esc(b.tooltip)}" ${attrs}background:${b.color}20; color:${b.color}; border-radius:4px; padding:2px 6px; font-size:9.5px; font-weight:600;">📌 ${esc(b.label)}</div>`;
+      }).join('')}</div>`
+    : '';
+
+  const totalEvents = Object.values(byDay).reduce((s, arr) => s + arr.length, 0) + banners.length;
+  const emptyHint = !totalEvents
+    ? `<div class="empty" style="padding:6px 2px; font-size:11px;">아직 등록된 운영계획·배치가 없습니다 — 아래 버튼으로 이 달 계획을 등록해보세요.</div>`
+    : '';
+
+  return `<div>
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+      <div style="font-weight:700; font-size:12.5px;">${year}년 ${month}월</div>
+      <button class="miniCalAddBtn" data-year="${year}" data-month="${month}" style="border:1px solid var(--border); background:#fff; border-radius:6px; padding:3px 8px; font-size:10.5px; cursor:pointer; color:var(--accent); font-weight:700;">+ 이 달 계획 추가</button>
+    </div>
+    ${bannerHtml}
+    ${emptyHint}
+    <div style="display:grid; grid-template-columns: repeat(7, 1fr); gap:3px; font-size:9px;">
+      ${dowLabels.map(l => `<div style="text-align:center; color:var(--muted); font-weight:600; padding-bottom:2px;">${l}</div>`).join('')}
+      ${cellsHtml}
+    </div>
+  </div>`;
+}
+
+// 캘린더가 비어있어도 무엇을 해야 할지 바로 알 수 있도록, "이 달 계획 추가" 버튼으로 ④ 등록 폼에 연/월을 미리 채워 스크롤 이동시킨다.
+function quickAddPlanForMonth(year, month) {
+  const yearSel = document.getElementById('planYear');
+  const monthSel = document.getElementById('planMonth');
+  if (![...yearSel.options].some(o => Number(o.value) === Number(year))) {
+    yearSel.insertAdjacentHTML('beforeend', `<option value="${year}">${year}년</option>`);
+  }
+  yearSel.value = year;
+  monthSel.value = month;
+  document.getElementById('planBasisNote').textContent = `${year}년 ${month}월 운영계획을 등록해보세요 — 기존 상품은 SKU를, 신규 후보는 "신규 제품"을 선택하세요.`;
+  document.getElementById('planTypeSelect').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+// ② 매출 스냅샷: KPI + TOP10 차트 + YoY 월별 차트 + (토글) 전체 상품표
+function renderCalSnapshot() {
+  const curYear = calYear, prevYear = calYear - 1;
+  const curRows = MONTHLY_SALES.filter(r => Number(r.sale_year) === curYear);
+  const prevRows = MONTHLY_SALES.filter(r => Number(r.sale_year) === prevYear);
+  const curRevenue = curRows.reduce((s, r) => s + (Number(r.net_sales_usd) || 0), 0);
+  const prevRevenue = prevRows.reduce((s, r) => s + (Number(r.net_sales_usd) || 0), 0);
+  const curSkus = new Set(curRows.map(r => r.sku || r.product_title));
+  const prevSkus = new Set(prevRows.map(r => r.sku || r.product_title));
+  const newSkus = [...curSkus].filter(s => !prevSkus.has(s));
+  const growth = (prevRows.length && prevRevenue) ? ((curRevenue - prevRevenue) / prevRevenue * 100) : null;
+  const note = document.getElementById('calYearNote');
+  if (note) note.textContent = prevRows.length ? '' : `${prevYear}년 비교 데이터가 없습니다.`;
+
+  document.getElementById('calKpiRow').innerHTML = `
+    <div class="kpi"><div class="label">${curYear}년 매출(USD)</div><div class="value">${fmtUsd(curRevenue)}</div><div class="sub">${prevYear}년 ${fmtUsd(prevRevenue)}</div></div>
+    <div class="kpi"><div class="label">전년 대비</div><div class="value ${growth !== null ? marginClass(growth) : ''}">${growth !== null ? `${growth >= 0 ? '+' : ''}${growth.toFixed(1)}%` : '-'}</div><div class="sub">${growth !== null ? (growth >= 0 ? '증가' : '감소') : '비교 데이터 없음'}</div></div>
+    <div class="kpi"><div class="label">판매 상품 수</div><div class="value">${curSkus.size}개</div><div class="sub">${prevYear}년 대비 신규 ${newSkus.length}개</div></div>
+  `;
+
+  const byProduct = {};
+  curRows.forEach(r => {
+    const key = r.sku || r.product_title;
+    if (!byProduct[key]) byProduct[key] = { sku: r.sku, title: r.product_title, vendor: r.vendor_name, revenue: 0, orders: 0 };
+    byProduct[key].revenue += Number(r.net_sales_usd) || 0;
+    byProduct[key].orders += Number(r.orders_count) || 0;
+  });
+  const allProducts = Object.values(byProduct);
+  const top10 = allProducts.slice().sort((a, b) => b.revenue - a.revenue).slice(0, 10);
+  makeChart('calTopProductChart', {
+    type: 'bar',
+    data: { labels: top10.map(p => (p.title || '').length > 14 ? p.title.slice(0, 13) + '…' : p.title), datasets: [{ label: '매출(USD)', data: top10.map(p => Math.round(p.revenue)), backgroundColor: '#2563eb' }] },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true } } },
+  });
+
+  const monthLabels = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
+  const curByMonth = Array(12).fill(0), prevByMonth = Array(12).fill(0);
+  curRows.forEach(r => { curByMonth[r.sale_month - 1] += Number(r.net_sales_usd) || 0; });
+  prevRows.forEach(r => { prevByMonth[r.sale_month - 1] += Number(r.net_sales_usd) || 0; });
+  makeChart('calYoyChart', {
+    type: 'bar',
+    data: { labels: monthLabels, datasets: [
+      { label: `${prevYear}년`, data: prevByMonth.map(Math.round), backgroundColor: '#9ca3af' },
+      { label: `${curYear}년`, data: curByMonth.map(Math.round), backgroundColor: '#2563eb' },
+    ]},
+    options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, title: { display: true, text: 'USD' } } } },
+  });
+
+  renderCalProductTable(allProducts);
+
+  const toggleBtn = document.getElementById('calToggleTableBtn');
+  if (!toggleBtn.dataset.bound) {
+    toggleBtn.addEventListener('click', () => {
+      const wrap = document.getElementById('calProductTableWrap');
+      const showing = wrap.style.display !== 'none';
+      wrap.style.display = showing ? 'none' : '';
+      toggleBtn.textContent = showing ? '전체 상품 매출표 펼치기 ▾' : '전체 상품 매출표 접기 ▴';
+    });
+    toggleBtn.dataset.bound = '1';
+  }
+}
+
+function renderCalProductTable(allProducts) {
+  const searchInput = document.getElementById('calProductSearch');
+  function apply() {
+    const q = (searchInput.value || '').toLowerCase();
+    const filtered = allProducts.filter(r => !q || (r.title || '').toLowerCase().includes(q) || (r.sku || '').toLowerCase().includes(q) || (r.vendor || '').toLowerCase().includes(q));
+    document.getElementById('calProductCount').textContent = `${filtered.length}개 상품`;
+    makeTable(document.getElementById('calProductTable'), [
+      { key: 'sku', label: 'SKU', render: r => `<td>${esc(r.sku || '-')}</td>` },
+      { key: 'title', label: '상품명', render: r => `<td>${esc(r.title)}</td>` },
+      { key: 'vendor', label: '업체', render: r => `<td>${esc(r.vendor || '-')}</td>` },
+      { key: 'orders', label: '주문수', render: r => `<td class="num">${fmtNum(r.orders)}</td>` },
+      { key: 'revenue', label: '매출(USD)', render: r => `<td class="num">${fmtUsd(r.revenue)}</td>` },
+    ], filtered, { defaultSort: 'revenue', defaultDir: -1 });
+  }
+  apply();
+  if (!searchInput.dataset.bound) { searchInput.addEventListener('input', apply); searchInput.dataset.bound = '1'; }
+}
+
+// ③ 시뮬레이션: 기존 SKU 모드 / 신규 소싱 후보(카테고리) 모드
+function populateSimControls() {
+  const modeSel = document.getElementById('simModeSelect');
+  if (modeSel.dataset.bound) return;
+  const skuSel = document.getElementById('simSkuSelect');
+  const catSel = document.getElementById('simCategorySelect');
+  const newLabel = document.getElementById('simNewProductLabel');
+  skuSel.innerHTML = '<option value="">SKU 선택</option>' + SKUS.map(s => `<option value="${s.id}">${esc(s.name_kr)} (${esc(s.direct_ship_code || '')})</option>`).join('');
+  const categories = Array.from(new Set(SKUS.map(s => s.category).filter(Boolean))).sort();
+  catSel.innerHTML = '<option value="">카테고리 선택</option>' + categories.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+
+  const brandCheckWrap = document.getElementById('simBrandCheckWrap');
+  modeSel.addEventListener('change', () => {
+    const isNewSourcing = modeSel.value === 'newsourcing';
+    skuSel.style.display = isNewSourcing ? 'none' : '';
+    catSel.style.display = isNewSourcing ? '' : 'none';
+    newLabel.style.display = isNewSourcing ? '' : 'none';
+    brandCheckWrap.style.display = isNewSourcing ? '' : 'none';
+  });
+
+  document.getElementById('simBrandChecked').addEventListener('change', updateSimApplyGate);
+
+  // 미리보기/샌드박스 환경에서 새 창 열기가 막히는 경우를 대비해, 열기 시도 + 복사 두 가지 방법을 모두 제공한다.
+  const openUrl = (url) => { if (!url) return; try { window.open(url, '_blank', 'noopener,noreferrer'); } catch (e) { /* 팝업 차단 시 무시 — 아래 복사 버튼으로 대체 */ } };
+  const copyUrl = async (inputId, btnEl) => {
+    const val = document.getElementById(inputId).value;
+    if (!val) return;
+    try {
+      await navigator.clipboard.writeText(val);
+    } catch (e) {
+      const inp = document.getElementById(inputId);
+      inp.removeAttribute('readonly'); inp.select(); document.execCommand('copy'); inp.setAttribute('readonly', 'readonly');
+    }
+    const original = btnEl.textContent;
+    btnEl.textContent = '복사됨!';
+    setTimeout(() => { btnEl.textContent = original; }, 1500);
+  };
+  document.getElementById('simBrandSearchBtn1').addEventListener('click', (e) => openUrl(e.currentTarget.dataset.url));
+  document.getElementById('simBrandSearchBtn2').addEventListener('click', (e) => openUrl(e.currentTarget.dataset.url));
+  document.getElementById('simBrandCopyBtn1').addEventListener('click', (e) => copyUrl('simBrandUrlNaver', e.currentTarget));
+  document.getElementById('simBrandCopyBtn2').addEventListener('click', (e) => copyUrl('simBrandUrlCoupang', e.currentTarget));
+  document.getElementById('simBrandPreviewBtn').addEventListener('click', async () => {
+    const q = (newLabel.value || catSel.value || '').trim();
+    const statusEl = document.getElementById('simBrandPreviewStatus');
+    const grid = document.getElementById('simBrandPreviewGrid');
+    if (!q) { alert('예상 제품명/브랜드명 또는 카테고리를 먼저 입력해주세요.'); return; }
+    statusEl.textContent = '검색 중...';
+    grid.innerHTML = '';
+    try {
+      const res = await callApi('search_brand_naver', { query: q, display: 8 });
+      if (!res.configured) {
+        statusEl.textContent = '';
+        grid.innerHTML = `<div class="empty" style="grid-column:1/-1; padding:8px 2px; font-size:11.5px;">네이버 검색 API가 아직 연동되지 않았습니다 (developers.naver.com에서 무료 '쇼핑 검색 API' 키를 발급받아 Supabase Edge Function Secrets에 NAVER_CLIENT_ID/NAVER_CLIENT_SECRET으로 등록하면 자동으로 활성화됩니다). 그동안은 위 검색 버튼/링크로 직접 확인해주세요.</div>`;
+        return;
+      }
+      if (!res.items || !res.items.length) { statusEl.textContent = '검색 결과가 없습니다.'; return; }
+      statusEl.textContent = `${res.items.length}개 결과 (네이버 쇼핑)`;
+      grid.innerHTML = res.items.map(it => `
+        <a href="${esc(it.link)}" target="_blank" rel="noopener" style="display:block; border:1px solid var(--border); border-radius:8px; overflow:hidden; text-decoration:none; color:var(--text); background:#fff;">
+          <div style="width:100%; aspect-ratio:1/1; background:#f4f2ee; overflow:hidden;"><img src="${esc(it.image)}" alt="${esc(it.title)}" style="width:100%; height:100%; object-fit:cover;" onerror="this.style.display='none'" /></div>
+          <div style="padding:6px 7px;">
+            <div style="font-size:10.5px; line-height:1.3; height:2.6em; overflow:hidden;" title="${esc(it.title)}">${esc(it.title)}</div>
+            <div style="font-size:11.5px; font-weight:700; color:var(--accent); margin-top:3px;">${it.lprice ? fmtKrw(it.lprice) : '가격 정보 없음'}</div>
+            <div style="font-size:9.5px; color:var(--muted); margin-top:1px;">${esc(it.mallName || '-')}</div>
+          </div>
+        </a>`).join('');
+    } catch (err) {
+      statusEl.textContent = '검색 중 오류가 발생했습니다.';
+    }
+  });
+
+  document.getElementById('simRunBtn').addEventListener('click', async () => {
+    const isNewSourcing = modeSel.value === 'newsourcing';
+    const params = {};
+    if (isNewSourcing) {
+      if (!catSel.value) { alert('카테고리를 선택해주세요.'); return; }
+      params.category = catSel.value;
+    } else {
+      if (!skuSel.value) { alert('SKU를 선택해주세요.'); return; }
+      params.skuId = skuSel.value;
+    }
+    if (isNewSourcing) {
+      const q = encodeURIComponent(newLabel.value || catSel.value);
+      const naverUrl = `https://search.naver.com/search.naver?query=${q}`;
+      const coupangUrl = `https://www.coupang.com/np/search?q=${q}`;
+      document.getElementById('simBrandUrlNaver').value = naverUrl;
+      document.getElementById('simBrandUrlCoupang').value = coupangUrl;
+      document.getElementById('simBrandSearchBtn1').dataset.url = naverUrl;
+      document.getElementById('simBrandSearchBtn2').dataset.url = coupangUrl;
+      document.getElementById('simBrandChecked').checked = false;
+      document.getElementById('simBrandNote').value = '';
+    }
+    const res = await callApi('suggest_plan', params);
+    res._isNewSourcing = isNewSourcing;
+    res._label = isNewSourcing ? (newLabel.value || catSel.value) : null;
+    res._category = catSel.value;
+    res._skuId = skuSel.value;
+    renderSimResult(res);
+  });
+
+  const monthSel = document.getElementById('simMonthSelect');
+  const monthLabels = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
+  monthSel.innerHTML = monthLabels.map((label, i) => `<option value="${i + 1}">${label}</option>`).join('');
+  monthSel.value = new Date().getMonth() + 1;
+  document.getElementById('simMonthRunBtn').addEventListener('click', async () => {
+    const res = await callApi('suggest_skus_for_month', { month: Number(monthSel.value) });
+    renderSimMonthResult(res);
+  });
+  modeSel.dataset.bound = '1';
+}
+
+let simMonthRows = [];
+let simMonthSelected = new Set();
+
+function renderSimMonthResult(res) {
+  const el = document.getElementById('simMonthResult');
+  const bulkWrap = document.getElementById('simMonthBulkWrap');
+  if (!res.rows || !res.rows.length) { el.innerHTML = '<div class="empty" style="padding:10px 2px;">이 달의 과거 판매 데이터가 없습니다.</div>'; simMonthRows = []; simMonthSelected = new Set(); bulkWrap.style.display = 'none'; return; }
+  simMonthRows = res.rows;
+  simMonthSelected = new Set(simMonthRows.map(r => r.sku || r.title)); // 기본값: 전체 IN(포함) 상태로 시작
+  bulkWrap.style.display = '';
+  populateSimMonthBulkYear();
+  wireSimMonthBulkSave();
+  const skuOptions = SKUS.slice().sort((a, b) => (a.name_kr || '').localeCompare(b.name_kr || ''))
+    .map(s => `<option value="${s.id}">${esc(s.name_kr)} (${esc(s.direct_ship_code || '')})</option>`).join('');
+  el.innerHTML = `
+    <div class="desc" style="margin-top:8px;">체크박스로 추천 목록에서 상품을 자유롭게 뺐다(OUT)/넣었다(IN) 하면서 조합을 조정해보세요 — 목표매출 값은 직접 수정할 수도 있습니다. 아래 합계는 체크(IN)된 상품들의 목표매출 합계입니다.</div>
+    <div class="toolbar" style="margin-top:8px;">
+      <select id="simMonthAddSkuSelect" style="min-width:220px;"><option value="">+ 기존 SKU 추가...</option>${skuOptions}</select>
+      <button id="simMonthAddSkuBtn" style="border:1px solid var(--border); background:#fff; border-radius:8px; padding:7px 12px; font-size:12px; cursor:pointer;">추천 목록에 추가</button>
+    </div>
+    <div class="table-scroll" style="margin-top:6px;" id="simMonthTableWrap"><table id="simMonthTable"></table></div>
+    <div id="simMonthSummary" style="margin-top:10px; padding:10px 12px; background:#f7f6f4; border-radius:8px; font-size:12.5px; font-weight:700;"></div>`;
+  drawSimMonthTable();
+  wireSimMonthTableEvents();
+  document.getElementById('simMonthAddSkuBtn').addEventListener('click', () => {
+    const sel = document.getElementById('simMonthAddSkuSelect');
+    if (!sel.value) { alert('추가할 SKU를 선택해주세요.'); return; }
+    addSkuToSimMonth(sel.value);
+    sel.value = '';
+  });
+}
+
+// 자동 추천 목록에 없는 기존 SKU를 사용자가 직접 골라 추가 — 같은 달(month) 과거 판매이력에서 연도별 평균을 계산해 채워준다.
+function addSkuToSimMonth(skuId) {
+  const sku = SKUS.find(s => s.id === skuId);
+  if (!sku) return;
+  const key = sku.direct_ship_code || sku.name_kr;
+  if (simMonthRows.some(r => (r.sku || r.title) === key)) { alert('이미 목록에 있는 SKU입니다.'); return; }
+  const monthSel = document.getElementById('simMonthSelect');
+  const month = Number(monthSel.value);
+  const matched = MONTHLY_SALES.filter(r => r.sku === sku.direct_ship_code && Number(r.sale_month) === month);
+  const byYear = {};
+  matched.forEach(r => { byYear[r.sale_year] = (byYear[r.sale_year] || 0) + (Number(r.net_sales_usd) || 0); });
+  const years = Object.keys(byYear).map(Number).sort();
+  const total = years.reduce((s, y) => s + byYear[y], 0);
+  const avgRevenue = years.length ? Math.round(total / years.length) : 0;
+  const newRow = { title: sku.name_kr, sku: sku.direct_ship_code, vendor: sku.vendor_name || null, avgRevenue, yearsCount: years.length, years, byYear, _manual: true };
+  simMonthRows = [...simMonthRows, newRow];
+  simMonthSelected.add(key);
+  drawSimMonthTable();
+}
+
+function drawSimMonthTable() {
+  makeTable(document.getElementById('simMonthTable'), [
+    { key: '_in', label: 'IN/OUT', render: r => {
+        const key = r.sku || r.title;
+        const checked = simMonthSelected.has(key) ? 'checked' : '';
+        return `<td style="text-align:center;"><input type="checkbox" class="simMonthInOut" data-key="${esc(key)}" ${checked} /></td>`;
+      } },
+    { key: 'title', label: '상품명', render: r => `<td>${esc(r.title)}</td>` },
+    { key: 'sku', label: 'SKU', render: r => `<td>${esc(r.sku || '-')}</td>` },
+    { key: 'vendor', label: '업체', render: r => `<td>${esc(r.vendor || '-')}</td>` },
+    { key: 'avgRevenue', label: '이 달 목표매출(USD)', render: r => {
+        const key = r.sku || r.title;
+        return `<td class="num"><input type="number" class="simMonthRevenueInput" data-key="${esc(key)}" value="${Math.round(Number(r.avgRevenue) || 0)}" style="width:90px; text-align:right; padding:3px 5px; border:1px solid var(--border); border-radius:5px; font-size:11.5px;" /></td>`;
+      } },
+    { key: 'yearsCount', label: '근거 연도', render: r => {
+        const years = r.years || [];
+        const byYear = r.byYear || {};
+        const detail = years.map(y => `${y}년 ${fmtUsd(byYear[y])}`).join(' · ');
+        return `<td class="num" title="${esc(detail)}">${years.join('·') || '-'}년 <span style="color:var(--muted); font-size:10px;">(${r.yearsCount}개년)</span></td>`;
+      } },
+    { key: '_pick', label: '', render: r => `<td><button data-sku="${esc(r.sku || '')}" class="simMonthPickBtn" style="border:1px solid var(--border); background:#fff; border-radius:6px; padding:3px 8px; font-size:11px; cursor:pointer;">이 SKU로 시뮬레이션</button></td>` },
+  ], simMonthRows, { defaultSort: 'avgRevenue', defaultDir: -1 });
+  updateSimMonthSummary();
+}
+
+function wireSimMonthTableEvents() {
+  const wrap = document.getElementById('simMonthTableWrap');
+  if (wrap.dataset.bound) return;
+  wrap.addEventListener('change', (e) => {
+    const cb = e.target.closest('.simMonthInOut');
+    if (!cb) return;
+    if (cb.checked) simMonthSelected.add(cb.dataset.key); else simMonthSelected.delete(cb.dataset.key);
+    updateSimMonthSummary();
+  });
+  wrap.addEventListener('input', (e) => {
+    const inp = e.target.closest('.simMonthRevenueInput');
+    if (!inp) return;
+    const row = simMonthRows.find(r => (r.sku || r.title) === inp.dataset.key);
+    if (row) row.avgRevenue = Number(inp.value) || 0;
+    updateSimMonthSummary();
+  });
+  wrap.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.simMonthPickBtn');
+    if (!btn) return;
+    e.stopPropagation();
+    const skuRow = SKUS.find(s => s.direct_ship_code === btn.dataset.sku);
+    if (!skuRow) { alert('해당 SKU 마스터 정보를 찾을 수 없습니다.'); return; }
+    document.getElementById('simModeSelect').value = 'existing';
+    document.getElementById('simModeSelect').dispatchEvent(new Event('change'));
+    document.getElementById('simSkuSelect').value = skuRow.id;
+    const simRes = await callApi('suggest_plan', { skuId: skuRow.id });
+    simRes._isNewSourcing = false;
+    simRes._skuId = skuRow.id;
+    renderSimResult(simRes);
+    document.getElementById('simResult').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+  wrap.dataset.bound = '1';
+}
+
+function updateSimMonthSummary() {
+  const elSum = document.getElementById('simMonthSummary');
+  if (!elSum) return;
+  const selectedRows = simMonthRows.filter(r => simMonthSelected.has(r.sku || r.title));
+  const total = selectedRows.reduce((s, r) => s + (Number(r.avgRevenue) || 0), 0);
+  elSum.innerHTML = `선택(IN) 상품 <b>${selectedRows.length}</b>개 / 전체 ${simMonthRows.length}개 &nbsp;·&nbsp; 이 달 합계 목표매출: <span style="color:var(--accent);">${fmtUsd(total)}</span>`;
+}
+
+// 등록 연도 드롭다운을 올해/내년으로 채운다(한 번만).
+function populateSimMonthBulkYear() {
+  const sel = document.getElementById('simMonthBulkYear');
+  if (sel.dataset.filled) return;
+  const now = new Date().getFullYear();
+  sel.innerHTML = [now, now + 1].map(y => `<option value="${y}">${y}년</option>`).join('');
+  sel.dataset.filled = '1';
+}
+
+// 역시뮬레이션에서 체크(IN)된 상품들을 ④ 운영 일정 등록 표로 한 번에 저장 — SKU/업체 매칭, 신규 제품 폴백, 주차 지정을 모두 처리한다.
+function wireSimMonthBulkSave() {
+  const btn = document.getElementById('simMonthBulkSaveBtn');
+  if (btn.dataset.bound) return;
+  btn.addEventListener('click', async () => {
+    const selectedRows = simMonthRows.filter(r => simMonthSelected.has(r.sku || r.title));
+    if (!selectedRows.length) { alert('등록할 상품을 하나 이상 체크(IN)해주세요.'); return; }
+    const month = Number(document.getElementById('simMonthSelect').value);
+    const year = Number(document.getElementById('simMonthBulkYear').value);
+    const week = document.getElementById('simMonthBulkWeek').value;
+    const { start, end } = weekToDateRange(year, month, week);
+    const badge = document.getElementById('currentUserBadge');
+    btn.disabled = true;
+    const origLabel = btn.textContent;
+    btn.textContent = '등록 중...';
+    let ok = 0, fail = 0;
+    for (const row of selectedRows) {
+      const skuRow = row.sku ? SKUS.find(s => s.direct_ship_code === row.sku) : null;
+      const vendorName = skuRow ? skuRow.vendor_name : row.vendor;
+      const vendorRow = vendorName ? VENDORS.find(v => v.name === vendorName) : null;
+      const yearsNote = (row.years || []).join('·');
+      const fields = {
+        vendor_id: vendorRow ? vendorRow.id : null,
+        sku_id: skuRow ? skuRow.id : null,
+        product_label: skuRow ? null : row.title,
+        plan_year: year,
+        plan_month: month,
+        planned_start: start,
+        planned_end: end,
+        planned_target_revenue_usd: Number(row.avgRevenue) || null,
+        planned_qty: null,
+        is_new_product: !skuRow,
+        status: 'PLANNED',
+        suggested_by: 'auto',
+        basis_note: `역시뮬레이션(${month}월 추천)${yearsNote ? ' 근거연도: ' + yearsNote + '년' : ''}`,
+        notes: null,
+        created_by: badge ? badge.textContent : null,
+      };
+      try { await callApi('upsert_operation_plan', { fields }); ok++; }
+      catch (e) { console.error('bulk save failed for', row, e); fail++; }
+    }
+    const { rows } = await callApi('list_operation_plans');
+    OPERATION_PLANS = rows || [];
+    renderPlanTable();
+    renderMiniCalendars();
+    btn.disabled = false;
+    btn.textContent = origLabel;
+    alert(`${ok}개 상품을 ④ 운영 일정 등록에 등록했습니다.${fail ? ` (실패 ${fail}건)` : ''}`);
+    const table = document.getElementById('planTable');
+    if (table) table.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+  btn.dataset.bound = '1';
+}
+
+function renderSimResult(res) {
+  const monthLabels = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
+  const el = document.getElementById('simResult');
+  if (!res.dataPoints) { el.innerHTML = `<div class="empty" style="padding:10px 2px;">${esc(res.basis)}</div>`; return; }
+  const topSet = new Set((res.recommendedMonths || []).map(r => r.month));
+  const chips = monthLabels.map((label, i) => {
+    const m = i + 1;
+    const isTop = topSet.has(m);
+    const byYear = (res.monthlyByYear && res.monthlyByYear[i]) || {};
+    const yearDetail = Object.keys(byYear).sort().map(y => `${y}년 ${fmtUsd(byYear[y])}`).join(' · ') || '데이터 없음';
+    return `<div title="${esc(yearDetail)}" style="flex:1; min-width:52px; text-align:center; padding:8px 4px; border-radius:8px; font-size:11px; ${isTop ? 'background:var(--accent); color:#fff; font-weight:700;' : 'background:#f4f2ee; color:var(--muted);'}">
+      <div>${label}</div><div style="font-size:10px; margin-top:2px;">${fmtUsd(res.monthlyAvg[i])}</div>
+    </div>`;
+  }).join('');
+  const top = (res.recommendedMonths || []).map(r => `${monthLabels[r.month - 1]}(평균 ${fmtUsd(r.avg)})`).join(', ');
+  const bestMonth = res.recommendedMonths && res.recommendedMonths[0];
+  const gateHint = res._isNewSourcing
+    ? `<div style="font-size:11px; color:#92400e; margin-top:4px;">↑ 위 브랜드 점검 체크박스를 확인해야 등록 버튼이 활성화됩니다.</div>` : '';
+  el.innerHTML = `
+    <div class="insight-item"><span class="insight-num">★</span><span>${esc(res.basis)}</span></div>
+    <div class="insight-item"><span class="insight-num">✓</span><span>추천 운영 시기: <b>${top || '데이터 부족으로 추천 불가'}</b></span></div>
+    <div style="display:flex; gap:4px; margin-top:10px; flex-wrap:wrap;">${chips}</div>
+    <div style="margin-top:12px;"><button id="simApplyBtn" style="border:none; background:var(--accent); color:#fff; border-radius:8px; padding:8px 14px; font-size:12.5px; font-weight:700; cursor:pointer;">이 결과로 등록하기 ↓</button>${gateHint}</div>`;
+  document.getElementById('simApplyBtn').addEventListener('click', () => {
+    if (res._isNewSourcing && !document.getElementById('simBrandChecked').checked) {
+      alert('먼저 위에서 외부 사이트를 통해 브랜드를 확인하고 체크박스를 체크해주세요.');
+      return;
+    }
+    res._brandNote = document.getElementById('simBrandNote') ? document.getElementById('simBrandNote').value : '';
+    applySimToPlanForm(res, bestMonth);
+  });
+  updateSimApplyGate();
+}
+
+// 신규 소싱(카테고리 평균) 결과는 브랜드를 직접 확인(체크)하기 전까지 "등록하기" 버튼을 비활성화해, 검증 없이 바로 데이터가 확정되지 않도록 한다.
+function updateSimApplyGate() {
+  const btn = document.getElementById('simApplyBtn');
+  const modeSel = document.getElementById('simModeSelect');
+  if (!btn || !modeSel) return;
+  const isNewSourcing = modeSel.value === 'newsourcing';
+  const checked = document.getElementById('simBrandChecked').checked;
+  const blocked = isNewSourcing && !checked;
+  btn.disabled = blocked;
+  btn.style.opacity = blocked ? '0.45' : '1';
+  btn.style.cursor = blocked ? 'not-allowed' : 'pointer';
+}
+
+function applySimToPlanForm(res, bestMonth) {
+  const typeSel = document.getElementById('planTypeSelect');
+  typeSel.value = res._isNewSourcing ? 'new' : 'existing';
+  typeSel.dispatchEvent(new Event('change'));
+  if (res._isNewSourcing) {
+    document.getElementById('planNewLabel').value = res._label || res._category || '';
+  } else if (res._skuId) {
+    document.getElementById('planSkuSelect').value = res._skuId;
+  }
+  if (bestMonth) {
+    document.getElementById('planMonth').value = bestMonth.month;
+    document.getElementById('planTargetRevenue').value = bestMonth.avg || '';
+  }
+  document.getElementById('planBasisNote').textContent = res.basis;
+  if (res._isNewSourcing && res._brandNote) {
+    const notesEl = document.getElementById('planNotes');
+    notesEl.value = `[브랜드 점검 메모]\n${res._brandNote}`;
+  }
+  typeSel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function populatePlanForm() {
+  const skuSel = document.getElementById('planSkuSelect');
+  if (skuSel.dataset.bound) return;
+  const vendorSel = document.getElementById('planVendorSelect');
+  const yearSel = document.getElementById('planYear');
+  const monthSel = document.getElementById('planMonth');
+  const newLabelInput = document.getElementById('planNewLabel');
+  skuSel.innerHTML = '<option value="">SKU 선택</option>' + SKUS.map(s => `<option value="${s.id}">${esc(s.name_kr)} (${esc(s.direct_ship_code || '')})</option>`).join('');
+  vendorSel.innerHTML = '<option value="">업체 선택</option>' + VENDORS.map(v => `<option value="${v.id}">${esc(v.name)}</option>`).join('');
+  const thisYear = new Date().getFullYear();
+  yearSel.innerHTML = [thisYear, thisYear + 1].map(y => `<option value="${y}">${y}년</option>`).join('');
+  monthSel.innerHTML = Array.from({ length: 12 }, (_, i) => i + 1).map(m => `<option value="${m}">${m}월</option>`).join('');
+
+  document.getElementById('planTypeSelect').addEventListener('change', (e) => {
+    const isNew = e.target.value === 'new';
+    newLabelInput.style.display = isNew ? '' : 'none';
+    skuSel.style.display = isNew ? 'none' : '';
+  });
+
+  document.getElementById('planAutoFillBtn').addEventListener('click', async () => {
+    const isNew = document.getElementById('planTypeSelect').value === 'new';
+    const params = {};
+    if (!isNew && skuSel.value) params.skuId = skuSel.value;
+    else {
+      const vd = VENDORS.find(v => v.id === vendorSel.value);
+      if (vd && vd.category) params.category = vd.category;
+    }
+    if (!params.skuId && !params.category) { alert('SKU 또는 업체를 먼저 선택해주세요 (업체 선택 시 해당 업체 카테고리 평균으로 추천합니다).'); return; }
+    const res = await callApi('suggest_plan', params);
+    document.getElementById('planBasisNote').textContent = res.basis;
+    if (res.recommendedMonths && res.recommendedMonths[0]) {
+      monthSel.value = res.recommendedMonths[0].month;
+      document.getElementById('planTargetRevenue').value = res.recommendedMonths[0].avg || '';
+    }
+  });
+
+  document.getElementById('planSaveBtn').addEventListener('click', savePlan);
+  skuSel.dataset.bound = '1';
+}
+
+// 월 전체가 아니라 "몇 주차"인지 지정하면 해당 주의 시작/종료일로 환산 — 캘린더에 배너가 아니라 실제 날짜 칸에 표시되게 해준다.
+function weekToDateRange(year, month, week) {
+  if (!week) return { start: null, end: null };
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const ranges = { 1: [1, 7], 2: [8, 14], 3: [15, 21], 4: [22, daysInMonth] };
+  const [s, e] = ranges[week] || [1, daysInMonth];
+  const pad = (n) => String(n).padStart(2, '0');
+  return { start: `${year}-${pad(month)}-${pad(s)}`, end: `${year}-${pad(month)}-${pad(Math.min(e, daysInMonth))}` };
+}
+
+async function savePlan() {
+  const isNew = document.getElementById('planTypeSelect').value === 'new';
+  const basisNote = document.getElementById('planBasisNote').textContent || null;
+  const badge = document.getElementById('currentUserBadge');
+  const planYear = Number(document.getElementById('planYear').value);
+  const planMonth = Number(document.getElementById('planMonth').value);
+  const week = document.getElementById('planWeek').value;
+  const { start, end } = weekToDateRange(planYear, planMonth, week);
+  const fields = {
+    vendor_id: document.getElementById('planVendorSelect').value || null,
+    sku_id: isNew ? null : (document.getElementById('planSkuSelect').value || null),
+    product_label: isNew ? document.getElementById('planNewLabel').value : null,
+    plan_year: planYear,
+    plan_month: planMonth,
+    planned_start: start,
+    planned_end: end,
+    planned_target_revenue_usd: Number(document.getElementById('planTargetRevenue').value) || null,
+    planned_qty: Number(document.getElementById('planQty').value) || null,
+    is_new_product: isNew,
+    status: 'PLANNED',
+    suggested_by: basisNote ? 'auto' : 'manual',
+    basis_note: basisNote,
+    notes: document.getElementById('planNotes').value || null,
+    created_by: badge ? badge.textContent : null,
+  };
+  if (!fields.plan_year || !fields.plan_month) { alert('연/월을 선택해주세요.'); return; }
+  if (!isNew && !fields.sku_id) { alert('SKU를 선택해주세요.'); return; }
+  if (isNew && !fields.product_label) { alert('신규 제품명을 입력해주세요.'); return; }
+  await callApi('upsert_operation_plan', { fields });
+  const { rows } = await callApi('list_operation_plans');
+  OPERATION_PLANS = rows || [];
+  document.getElementById('planNotes').value = '';
+  document.getElementById('planWeek').value = '';
+  renderPlanTable();
+  renderMiniCalendars();
+}
+
+// 해당 연/월의 말일 계산.
+function daysInMonth(year, month) { return new Date(year, month, 0).getDate(); }
+// 연/월/일을 ISO 날짜 문자열로 조합 (일자가 없으면 null).
+function toIsoDate(year, month, day) {
+  if (!year || !month || !day) return null;
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${year}-${pad(month)}-${pad(day)}`;
+}
+
+function renderPlanTable() {
+  document.getElementById('planCount').textContent = `${OPERATION_PLANS.length}건`;
+  makeTable(document.getElementById('planTable'), [
+    { key: 'plan_year', label: '연도', render: r => `<td>${r.plan_year}</td>` },
+    { key: 'plan_month', label: '월', render: r => `<td>${r.plan_month}월</td>` },
+    { key: 'product_label', label: '상품', render: r => `<td>${esc(r.is_new_product ? `${r.product_label || '-'} (신규)` : (r.sku_name || r.product_label || '-'))}</td>` },
+    { key: 'vendor_name', label: '업체', render: r => `<td>${esc(r.vendor_name || '-')}</td>` },
+    { key: 'planned_start', label: '일정(일자)', render: r => {
+        const sDay = r.planned_start ? Number(r.planned_start.split('-')[2]) : '';
+        const eDay = r.planned_end ? Number(r.planned_end.split('-')[2]) : '';
+        return `<td style="white-space:nowrap;">
+          <span style="display:inline-flex; align-items:center; gap:1px;">
+            <input type="number" class="planDayInput" data-id="${r.id}" data-field="planned_start" min="1" max="31" placeholder="일" value="${sDay}" style="width:38px; padding:3px 3px; border:1px solid var(--border); border-radius:5px; font-size:11px; text-align:center;" />일
+            <button type="button" class="planDayCalBtn" data-id="${r.id}" data-field="planned_start" title="달력에서 선택" style="border:none; background:none; cursor:pointer; font-size:13px; padding:0 2px;">📅</button>
+          </span>
+          <span style="color:var(--muted); font-size:10px;">~</span>
+          <span style="display:inline-flex; align-items:center; gap:1px;">
+            <input type="number" class="planDayInput" data-id="${r.id}" data-field="planned_end" min="1" max="31" placeholder="일" value="${eDay}" style="width:38px; padding:3px 3px; border:1px solid var(--border); border-radius:5px; font-size:11px; text-align:center;" />일
+            <button type="button" class="planDayCalBtn" data-id="${r.id}" data-field="planned_end" title="달력에서 선택" style="border:none; background:none; cursor:pointer; font-size:13px; padding:0 2px;">📅</button>
+          </span>
+        </td>`;
+      } },
+    { key: 'planned_target_revenue_usd', label: '목표매출', render: r => `<td class="num">${fmtUsd(r.planned_target_revenue_usd)}</td>` },
+    { key: 'status', label: '상태', render: r => `<td>${esc(r.status)}</td>` },
+    { key: 'suggested_by', label: '산출방식', render: r => `<td>${r.suggested_by === 'auto' ? '자동추천' : '수동입력'}</td>` },
+    { key: 'notes', label: '메모', render: r => r.notes ? `<td title="${esc(r.notes)}" style="cursor:help;">📝 ${esc(r.notes.slice(0, 12))}${r.notes.length > 12 ? '…' : ''}</td>` : '<td style="color:var(--muted);">-</td>' },
+    { key: '_del', label: '', render: r => `<td><button data-id="${r.id}" class="planDelBtn" style="border:1px solid var(--border); background:#fff; border-radius:6px; padding:3px 8px; font-size:11px; cursor:pointer;">삭제</button></td>` },
+  ], OPERATION_PLANS, { defaultSort: 'plan_year', defaultDir: -1, onRowClick: (row) => openCalendarChipEdit('plan', row.id) });
+  document.querySelectorAll('.planDelBtn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await callApi('delete_operation_plan', { id: btn.dataset.id });
+      const { rows } = await callApi('list_operation_plans');
+      OPERATION_PLANS = rows || [];
+      renderPlanTable();
+      renderMiniCalendars();
+    });
+  });
+  wirePlanTableDateInputs();
+}
+
+// 일자 하나만 바꾼 뒤 연/월과 조합해 저장 — 달 범위를 벗어나면 안내하고 중단.
+async function saveDayField(row, field, day, inputEl) {
+  const dim = daysInMonth(row.plan_year, row.plan_month);
+  if (day && (day < 1 || day > dim)) {
+    alert(`${row.plan_month}월은 ${dim}일까지 있습니다.`);
+    if (inputEl) inputEl.value = row[field] ? Number(row[field].split('-')[2]) : '';
+    return;
+  }
+  const iso = day ? toIsoDate(row.plan_year, row.plan_month, day) : null;
+  if (inputEl) inputEl.style.borderColor = 'var(--accent)';
+  try {
+    await callApi('upsert_operation_plan', { id: row.id, fields: { [field]: iso } });
+    row[field] = iso;
+    renderMiniCalendars();
+  } finally {
+    if (inputEl) setTimeout(() => { inputEl.style.borderColor = ''; }, 600);
+  }
+}
+
+// 표 안에서 일자만 바로 입력하거나(연/월은 이미 정해져 있으므로), 📅 버튼으로 작은 달력을 띄워 클릭 한 번으로 선택 — 모달을 열 필요가 없다.
+function wirePlanTableDateInputs() {
+  const table = document.getElementById('planTable');
+  if (table.dataset.dateBound) return;
+  // 캡처 단계(true)에서 가로채야 한다 — makeTable의 onRowClick(행 클릭 시 수정 모달 열기)이 tr에 등록되어 있어,
+  // 버블 단계에서만 막으면 tr의 리스너가 먼저 실행되어 모달과 달력이 동시에 열려버린다.
+  table.addEventListener('click', (e) => {
+    if (e.target.closest('.planDayInput')) { e.stopPropagation(); return; }
+    const btn = e.target.closest('.planDayCalBtn');
+    if (!btn) return;
+    e.stopPropagation();
+    const row = OPERATION_PLANS.find(p => String(p.id) === String(btn.dataset.id));
+    if (!row) return;
+    const field = btn.dataset.field;
+    const existing = row[field];
+    const currentDay = existing ? Number(existing.split('-')[2]) : null;
+    openDayPicker(btn, row.plan_year, row.plan_month, currentDay, (day) => {
+      const input = btn.parentElement.querySelector('.planDayInput');
+      if (input) input.value = day === null ? '' : day; // day===null(지우기)일 때 .value에 문자열 "null"이 찍히는 것을 방지
+      saveDayField(row, field, day, input);
+    });
+  }, true);
+  table.addEventListener('change', async (e) => {
+    const inp = e.target.closest('.planDayInput');
+    if (!inp) return;
+    e.stopPropagation();
+    const row = OPERATION_PLANS.find(p => String(p.id) === String(inp.dataset.id));
+    if (!row) return;
+    const day = inp.value ? Number(inp.value) : null;
+    await saveDayField(row, inp.dataset.field, day, inp);
+  });
+  table.dataset.dateBound = '1';
+}
+
+// ---- 작은 일자 선택 달력 팝업 (연/월은 이미 정해진 상태로, 일자 클릭 한 번에 선택) ----
+let activeDayPicker = null;
+function closeDayPicker() {
+  if (!activeDayPicker) return;
+  activeDayPicker.remove();
+  activeDayPicker = null;
+  document.removeEventListener('click', closeDayPickerOnOutsideClick, true);
+}
+function closeDayPickerOnOutsideClick(e) {
+  if (activeDayPicker && !activeDayPicker.contains(e.target)) closeDayPicker();
+}
+function openDayPicker(anchorBtn, year, month, currentDay, onPick) {
+  closeDayPicker();
+  const dim = daysInMonth(year, month);
+  const firstDow = new Date(year, month - 1, 1).getDay();
+  const dowLabels = ['일', '월', '화', '수', '목', '금', '토'];
+  let cellsHtml = dowLabels.map(d => `<div style="text-align:center; font-size:10px; color:var(--muted); padding:2px 0;">${d}</div>`).join('');
+  for (let i = 0; i < firstDow; i++) cellsHtml += '<div></div>';
+  for (let d = 1; d <= dim; d++) {
+    const isCur = d === currentDay;
+    cellsHtml += `<div class="dayPickCell" data-day="${d}" style="text-align:center; font-size:11px; padding:4px 0; cursor:pointer; border-radius:5px; ${isCur ? 'background:var(--accent); color:#fff; font-weight:700;' : ''}">${d}</div>`;
+  }
+  const pop = document.createElement('div');
+  pop.style.cssText = 'position:absolute; z-index:1000; background:#fff; border:1px solid var(--border); border-radius:8px; box-shadow:0 6px 20px rgba(0,0,0,0.18); padding:8px; width:190px;';
+  pop.innerHTML = `<div style="font-size:11px; font-weight:700; margin-bottom:6px; text-align:center;">${year}년 ${month}월</div>
+    <div style="display:grid; grid-template-columns:repeat(7,1fr); gap:2px;">${cellsHtml}</div>
+    <div style="margin-top:6px; text-align:center;"><button type="button" class="dayPickClear" style="border:none; background:none; color:var(--muted); font-size:10px; cursor:pointer; text-decoration:underline;">지우기</button></div>`;
+  document.body.appendChild(pop);
+  const rect = anchorBtn.getBoundingClientRect();
+  pop.style.top = (window.scrollY + rect.bottom + 4) + 'px';
+  pop.style.left = (window.scrollX + rect.left) + 'px';
+  pop.querySelectorAll('.dayPickCell').forEach(cell => {
+    const d = Number(cell.dataset.day);
+    cell.addEventListener('mouseenter', () => { if (d !== currentDay) cell.style.background = '#f4f2ee'; });
+    cell.addEventListener('mouseleave', () => { if (d !== currentDay) cell.style.background = ''; });
+    cell.addEventListener('click', (e) => { e.stopPropagation(); onPick(d); closeDayPicker(); });
+  });
+  pop.querySelector('.dayPickClear').addEventListener('click', (e) => { e.stopPropagation(); onPick(null); closeDayPicker(); });
+  activeDayPicker = pop;
+  setTimeout(() => document.addEventListener('click', closeDayPickerOnOutsideClick, true), 0);
+}
+
 function renderVendors() {
   const columns = [
     { key: 'name', label: '업체명', render: r => `<td>${esc(r.name)}</td>` },
@@ -1738,9 +3087,15 @@ function renderVendors() {
     { key: 'sales_contact1_phone', label: '연락처', render: r => `<td>${esc(r.sales_contact1_phone)}</td>` },
     { key: 'email', label: '이메일', render: r => `<td>${esc(r.email)}</td>` },
     { key: 'payment_terms', label: '결제조건', render: r => `<td>${esc(r.payment_terms)}</td>` },
+    { key: '_monitor', label: '', render: r => `<td><button data-id="${r.id}" class="vendorMonitorBtn" style="border:1px solid var(--border); background:#fff; border-radius:6px; padding:4px 10px; font-size:11px; cursor:pointer; white-space:nowrap;">판매 모니터링</button></td>` },
   ];
   const tableEl = document.getElementById('vendorTable');
   const controller = makeTable(tableEl, columns, VENDORS, { defaultSort: 'name', defaultDir: 1, onRowClick: openVendorEditModal });
+  function bindMonitorButtons() {
+    tableEl.querySelectorAll('.vendorMonitorBtn').forEach(btn => {
+      btn.addEventListener('click', (e) => { e.stopPropagation(); openVendorMonitorModal(btn.dataset.id); });
+    });
+  }
   function applyFilter() {
     const q = document.getElementById('vendorSearch').value.trim().toLowerCase();
     const status = document.getElementById('vendorStatusFilter').value;
@@ -1751,6 +3106,7 @@ function renderVendors() {
     });
     controller.setRows(filtered);
     document.getElementById('vendorCount').textContent = filtered.length + ' / ' + VENDORS.length + '개 업체';
+    bindMonitorButtons();
   }
   document.getElementById('vendorSearch').addEventListener('input', applyFilter);
   document.getElementById('vendorStatusFilter').addEventListener('change', applyFilter);
@@ -2833,19 +4189,24 @@ document.querySelectorAll('nav.tabs button').forEach(btn => {
 // ---------------- BOOT ----------------
 async function boot() {
   try {
-    const [vendorsRes, skusRes, batchesRes, cathistRes] = await Promise.all([
+    const [vendorsRes, skusRes, batchesRes, cathistRes, monthlySalesRes, plansRes] = await Promise.all([
       callApi('list_vendors_light'),
       callApi('list_skus_light'),
       callApi('list_batches'),
       callApi('list_cathist'),
+      callApi('list_monthly_sales'),
+      callApi('list_operation_plans'),
     ]);
     VENDORS = vendorsRes.rows || [];
     SKUS = sortByVendorName(skusRes.rows);
     BATCHES = batchesRes.rows || [];
     CATHIST = cathistRes.rows || [];
+    MONTHLY_SALES = monthlySalesRes.rows || [];
+    OPERATION_PLANS = plansRes.rows || [];
     document.getElementById('loading').style.display = 'none';
     document.querySelectorAll('.panel')[0].classList.add('active');
     renderOverview();
+    renderCalendarTab();
     renderTargets();
     renderCategory();
     renderVendors();
@@ -2860,6 +4221,7 @@ async function boot() {
     renderInquiriesTab();
     updatePendingAccountBadge();
     renderAccountsTab();
+    renderVendorMonitorAccountsTab();
     renderLaunchQueue();
     updateEditReqBadge();
     renderEditRequestsTab();
@@ -3211,21 +4573,22 @@ function wireLaunchForm() {
   });
 }
 
-function renderVendorBanner() {
-  const wrap = document.getElementById('vendorBannerWrap');
-  if (!VP_VENDOR) { wrap.innerHTML = '<div class="empty">업체 정보를 찾을 수 없습니다.</div>'; return; }
-  if (!VP_BATCHES.length) {
-    wrap.innerHTML = `<div class="vbanner"><div class="vbanner-top"><div><div class="vbanner-name">${esc(VP_VENDOR.name)}</div>
-      <div class="vbanner-meta">${esc(VP_VENDOR.category) || ''}</div></div></div>
+// vendor: 업체 row(name/category/status/payment_terms 포함), batches: 해당 업체 배치 전체, wrap: 렌더할 DOM 엘리먼트.
+// 제조사 포털 화면과 관리자용 "업체별 판매 모니터링" 모달이 이 함수 하나를 공유한다.
+function renderVendorBannerInto(vendor, batches, wrap) {
+  if (!vendor) { wrap.innerHTML = '<div class="empty">업체 정보를 찾을 수 없습니다.</div>'; return; }
+  if (!batches.length) {
+    wrap.innerHTML = `<div class="vbanner"><div class="vbanner-top"><div><div class="vbanner-name">${esc(vendor.name)}</div>
+      <div class="vbanner-meta">${esc(vendor.category) || ''}</div></div></div>
       <div style="color:#cfcac0; font-size:12.5px;">아직 등록된 배치 판매 데이터가 없습니다.</div></div>`;
     return;
   }
-  const totalQty = VP_BATCHES.reduce((s, b) => s + (Number(b.qty_total) || 0), 0);
-  const totalRevenue = VP_BATCHES.reduce((s, b) => s + (Number(b.revenue_total_usd) || 0), 0);
-  const latestYear = Math.max(...VP_BATCHES.map(b => Number(b.year) || 0));
-  const latestBatches = VP_BATCHES.filter(b => Number(b.year) === latestYear);
+  const totalQty = batches.reduce((s, b) => s + (Number(b.qty_total) || 0), 0);
+  const totalRevenue = batches.reduce((s, b) => s + (Number(b.revenue_total_usd) || 0), 0);
+  const latestYear = Math.max(...batches.map(b => Number(b.year) || 0));
+  const latestBatches = batches.filter(b => Number(b.year) === latestYear);
   const latestMonth = Math.max(...latestBatches.map(b => Number(b.month) || 0));
-  const monthBatches = VP_BATCHES.filter(b => Number(b.year) === latestYear && Number(b.month) === latestMonth);
+  const monthBatches = batches.filter(b => Number(b.year) === latestYear && Number(b.month) === latestMonth);
   const monthQty = monthBatches.reduce((s, b) => s + (Number(b.qty_total) || 0), 0);
   const monthRevenue = monthBatches.reduce((s, b) => s + (Number(b.revenue_total_usd) || 0), 0);
   const monthTarget = monthBatches.reduce((s, b) => s + (Number(b.target_revenue_usd) || 0), 0);
@@ -3233,16 +4596,16 @@ function renderVendorBanner() {
   const marginAvg = monthBatches.length ? monthBatches.reduce((s, b) => s + (Number(b.margin_rate) || 0), 0) / monthBatches.length : null;
   const cancelSum = monthBatches.reduce((s, b) => s + (Number(b.cancel_count) || 0), 0);
   const claimSum = monthBatches.reduce((s, b) => s + (Number(b.claim_count) || 0), 0);
-  const statusColor = VP_VENDOR.status === 'CONTINUE' ? '#15803d' : VP_VENDOR.status === 'STOP' ? '#b91c1c' : '#b45309';
+  const statusColor = vendor.status === 'CONTINUE' ? '#15803d' : vendor.status === 'STOP' ? '#b91c1c' : '#b45309';
 
   wrap.innerHTML = `
     <div class="vbanner">
       <div class="vbanner-top">
         <div>
-          <div class="vbanner-name">${esc(VP_VENDOR.name)}</div>
-          <div class="vbanner-meta">${esc(VP_VENDOR.category) || ''} · 결제조건: ${esc(VP_VENDOR.payment_terms) || '미등록'}</div>
+          <div class="vbanner-name">${esc(vendor.name)}</div>
+          <div class="vbanner-meta">${esc(vendor.category) || ''} · 결제조건: ${esc(vendor.payment_terms) || '미등록'}</div>
         </div>
-        <span class="vbanner-tag" style="background:${statusColor}; color:#fff;">${esc(VP_VENDOR.status) || '-'}</span>
+        <span class="vbanner-tag" style="background:${statusColor}; color:#fff;">${esc(vendor.status) || '-'}</span>
       </div>
       <div class="vbanner-stats">
         <div><div class="vstat-label">${latestYear}년 ${latestMonth}월 매출</div><div class="vstat-value">${fmtUsd(monthRevenue)}</div><div class="vstat-sub">목표 ${fmtUsd(monthTarget)}</div></div>
@@ -3253,13 +4616,17 @@ function renderVendorBanner() {
       ${(cancelSum > 0 || claimSum > 0) ? `<div class="vbanner-alert">⚠️ 이번 달 취소 ${cancelSum}건 · 클레임 ${claimSum}건이 있습니다. 자세한 내용은 담당자에게 문의해주세요.</div>` : ''}
     </div>`;
 }
+function renderVendorBanner() { renderVendorBannerInto(VP_VENDOR, VP_BATCHES, document.getElementById('vendorBannerWrap')); }
 
-function renderVendorBatchTable() {
-  const el = document.getElementById('vendorBatchTable');
-  const rows = VP_BATCHES.slice(0, 15);
-  if (!rows.length) { el.parentElement.innerHTML = '<div class="empty">배치 내역이 없습니다</div>'; return; }
-  el.innerHTML = '<thead><tr><th>년월</th><th>배치</th><th>제품수</th><th>출고일</th><th>수량</th><th>매출($)</th><th>마진율</th></tr></thead>' +
-    '<tbody>' + rows.map(b => `<tr>
+// 배치 목록 테이블(제조사 포털 · 관리자 모니터링 모달 공용, 15건 제한 없음 · 출고일 최신순)
+function renderBatchListTable(tableEl, batches) {
+  if (!batches.length) {
+    tableEl.innerHTML = '<tbody><tr><td class="empty">해당 조건의 배치 내역이 없습니다</td></tr></tbody>';
+    return;
+  }
+  const sorted = batches.slice().sort((a, b) => String(b.ship_date || '').localeCompare(String(a.ship_date || '')));
+  tableEl.innerHTML = '<thead><tr><th>년월</th><th>배치</th><th>제품수</th><th>출고일</th><th>수량</th><th>매출($)</th><th>마진율</th></tr></thead>' +
+    '<tbody>' + sorted.map(b => `<tr>
       <td>${b.year}.${b.month}</td>
       <td>${esc(b.batch_label)}</td>
       <td>${esc(b.product_summary)}</td>
@@ -3268,6 +4635,154 @@ function renderVendorBatchTable() {
       <td class="num">${fmtUsd(b.revenue_total_usd)}</td>
       <td class="num ${marginClass(b.margin_rate)}">${fmtPct(b.margin_rate)}</td>
     </tr>`).join('') + '</tbody>';
+}
+
+// 제조사 포털: 출고일 기준 일자별 조회(날짜범위 필터) — 더 이상 최근 15건으로 제한하지 않고 전체 배치를 필터링해서 보여준다.
+function renderVendorBatchTable() {
+  const fromEl = document.getElementById('vpDateFrom');
+  const toEl = document.getElementById('vpDateTo');
+  if (!fromEl.dataset.bound) {
+    fromEl.addEventListener('change', renderVendorBatchTable);
+    toEl.addEventListener('change', renderVendorBatchTable);
+    document.getElementById('vpDateClear').addEventListener('click', () => { fromEl.value = ''; toEl.value = ''; renderVendorBatchTable(); });
+    fromEl.dataset.bound = '1';
+  }
+  const from = fromEl.value, to = toEl.value;
+  const filtered = VP_BATCHES.filter(b => (!from || (b.ship_date && b.ship_date >= from)) && (!to || (b.ship_date && b.ship_date <= to)));
+  document.getElementById('vpBatchCount').textContent = `${filtered.length}건`;
+  renderBatchListTable(document.getElementById('vendorBatchTable'), filtered);
+}
+
+// 관리자용: 업체(vendors) 탭에서 특정 업체를 선택해, 그 업체가 보는 제조사 포털 화면(배너+판매내역+일자별 필터)을
+// 그대로 모니터링할 수 있는 모달. 이미 로드된 전역 BATCHES(전체 업체 배치)를 vendor_id로 필터링해 재사용하므로 추가 API 호출이 없다.
+function openVendorMonitorModal(vendorId) {
+  const vendor = VENDORS.find(v => v.id === vendorId);
+  if (!vendor) return;
+  const allBatches = BATCHES.filter(b => b.vendor_id === vendorId);
+  document.getElementById('vendorMonitorTitle').textContent = '업체 판매 모니터링 — ' + (vendor.name || '');
+  renderVendorBannerInto(vendor, allBatches, document.getElementById('vendorMonitorBannerWrap'));
+
+  // 월별 매출 미니 차트 (최근 12개월)
+  const byMonth = {};
+  allBatches.forEach(b => { const k = `${b.year}-${String(b.month).padStart(2, '0')}`; byMonth[k] = (byMonth[k] || 0) + (Number(b.revenue_total_usd) || 0); });
+  const keys = Object.keys(byMonth).sort().slice(-12);
+  makeChart('vendorMonitorChart', {
+    type: 'line',
+    data: { labels: keys.map(labelForKey), datasets: [{ label: '월매출(USD)', data: keys.map(k => Math.round(byMonth[k])), borderColor: '#2563eb', backgroundColor: '#2563eb22', fill: true, tension: 0.3 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
+  });
+
+  const fromEl = document.getElementById('vmDateFrom');
+  const toEl = document.getElementById('vmDateTo');
+  fromEl.value = ''; toEl.value = '';
+  function apply() {
+    const from = fromEl.value, to = toEl.value;
+    const filtered = allBatches.filter(b => (!from || (b.ship_date && b.ship_date >= from)) && (!to || (b.ship_date && b.ship_date <= to)));
+    document.getElementById('vmCount').textContent = `${filtered.length}건`;
+    renderBatchListTable(document.getElementById('vendorMonitorTable'), filtered);
+  }
+  fromEl.onchange = apply;
+  toEl.onchange = apply;
+  document.getElementById('vmDateClear').onclick = () => { fromEl.value = ''; toEl.value = ''; apply(); };
+  apply();
+
+  renderVendorMonitorInquiries(vendorId);
+  document.getElementById('vendorMonitorOverlay').style.display = 'flex';
+}
+
+// 읽기 전용: 이 업체가 제조사 포털에서 주고받은 문의 스레드를 관리자 화면에서 그대로 보여준다.
+function renderVendorMonitorInquiries(vendorId) {
+  const listEl = document.getElementById('vmInquiryList');
+  const threadEl = document.getElementById('vmInquiryThread');
+  const vendorInquiries = INQUIRIES.filter(i => i.vendor_id === vendorId).sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at));
+  if (!vendorInquiries.length) {
+    listEl.innerHTML = '<div class="empty" style="padding:10px 4px;">문의 내역이 없습니다</div>';
+    threadEl.innerHTML = '';
+    return;
+  }
+  function renderThread(inquiryId) {
+    const msgs = INQ_MESSAGES.filter(m => m.inquiry_id === inquiryId);
+    threadEl.innerHTML = msgs.map(m => {
+      const isBot = m.sender_type === 'bot';
+      const isAdmin = m.sender_type === 'admin';
+      const isOurSide = isAdmin || isBot;
+      const bubbleStyle = isBot ? 'background:#E8F0FE; color:#1a3d7c; border:1px solid #c7d9f9; border-radius:16px 16px 4px 16px;'
+        : isAdmin ? 'background:#FEE500; color:#3c1e1e; border-radius:16px 16px 4px 16px;'
+        : 'background:#fff; color:var(--text); border-radius:16px 16px 16px 4px;';
+      const bubble = `<div style="display:inline-block; max-width:80%; text-align:left; padding:9px 12px; border-radius:16px; font-size:13px; line-height:1.45; white-space:pre-wrap; ${bubbleStyle}">${esc(m.message)}</div>`;
+      return `<div style="margin-bottom:6px; display:flex; flex-direction:column; align-items:${isOurSide ? 'flex-end' : 'flex-start'};">
+        <div style="font-size:10.5px; color:#3c1e1e; opacity:0.7; margin:0 4px 2px;">${isBot ? '🤖 AI 자동응답' : (isAdmin ? '관리자' : esc(m.sender_name || '제조사'))}</div>
+        ${bubble}
+      </div>`;
+    }).join('') || '<div class="empty">메시지가 없습니다</div>';
+  }
+  function renderList() {
+    listEl.innerHTML = vendorInquiries.map(i => `<div class="vmInqRow" data-id="${i.id}" style="padding:8px; border-radius:8px; cursor:pointer; font-size:12px; margin-bottom:4px;">
+      <div style="font-weight:600;">${esc(i.subject || '(제목 없음)')}</div>
+      <div style="color:var(--muted); font-size:10.5px;">${esc(i.status)} · ${timeAgo(i.updated_at || i.created_at)}</div>
+    </div>`).join('');
+    listEl.querySelectorAll('.vmInqRow').forEach(el => {
+      el.addEventListener('click', () => {
+        listEl.querySelectorAll('.vmInqRow').forEach(x => x.style.background = 'transparent');
+        el.style.background = '#f4f2ee';
+        renderThread(el.dataset.id);
+      });
+    });
+  }
+  renderList();
+  renderThread(vendorInquiries[0].id);
+  listEl.querySelector('.vmInqRow').style.background = '#f4f2ee';
+}
+function closeVendorMonitorModal() { document.getElementById('vendorMonitorOverlay').style.display = 'none'; }
+document.getElementById('vendorMonitorClose').addEventListener('click', closeVendorMonitorModal);
+document.getElementById('vendorMonitorOverlay').addEventListener('click', (e) => { if (e.target.id === 'vendorMonitorOverlay') closeVendorMonitorModal(); });
+
+// ---------------- 제조사(모니터링) 탭: 계정종류=제조사로 가입한 계정 목록 ----------------
+function renderVendorMonitorAccountsTab() {
+  const tableEl = document.getElementById('vendorMonitorAccountsTable');
+  const vendorAccounts = ACCOUNTS.filter(a => a.role === 'vendor');
+  const revenueByVendor = {}, qtyByVendor = {};
+  BATCHES.forEach(b => {
+    if (!b.vendor_id) return;
+    revenueByVendor[b.vendor_id] = (revenueByVendor[b.vendor_id] || 0) + (Number(b.revenue_total_usd) || 0);
+    qtyByVendor[b.vendor_id] = (qtyByVendor[b.vendor_id] || 0) + (Number(b.qty_total) || 0);
+  });
+  const rows = vendorAccounts.map(a => ({
+    ...a,
+    _revenue: revenueByVendor[a.vendor_id] || 0,
+    _qty: qtyByVendor[a.vendor_id] || 0,
+  }));
+
+  const columns = [
+    { key: 'username', label: '아이디', render: r => `<td>${esc(r.username)}</td>` },
+    { key: 'vendor_name', label: '업체명', render: r => `<td>${esc(r.vendor_name || '(연결 안됨)')}</td>` },
+    { key: 'status', label: '계정 상태', render: r => `<td>${esc(ACCOUNT_STATUS_LABELS[r.status] || r.status)}</td>` },
+    { key: '_revenue', label: '누적매출(USD)', render: r => `<td class="num">${fmtUsd(r._revenue)}</td>` },
+    { key: '_qty', label: '누적판매수량', render: r => `<td class="num">${r._qty.toLocaleString()}</td>` },
+    { key: 'last_login_at', label: '최근 로그인', render: r => `<td>${r.last_login_at ? timeAgo(r.last_login_at) : '로그인 이력 없음'}</td>` },
+    { key: '_monitor', label: '', render: r => `<td><button data-vendor-id="${r.vendor_id || ''}" class="vmTabMonitorBtn" style="border:1px solid var(--border); background:#fff; border-radius:6px; padding:4px 10px; font-size:11px; cursor:pointer; white-space:nowrap;" ${r.vendor_id ? '' : 'disabled'}>모니터링 보기</button></td>` },
+  ];
+  const controller = makeTable(tableEl, columns, rows, { defaultSort: '_revenue', defaultDir: -1 });
+
+  function bindMonitorButtons() {
+    tableEl.querySelectorAll('.vmTabMonitorBtn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (btn.dataset.vendorId) openVendorMonitorModal(btn.dataset.vendorId);
+      });
+    });
+  }
+
+  function applyFilter() {
+    const q = (document.getElementById('vmTabSearch').value || '').trim().toLowerCase();
+    const filtered = !q ? rows : rows.filter(r => [r.username, r.vendor_name].some(f => (f || '').toLowerCase().includes(q)));
+    controller.setRows(filtered);
+    document.getElementById('vmTabCount').textContent = `${filtered.length} / ${rows.length}개 제조사 계정`;
+    bindMonitorButtons();
+  }
+  const searchInput = document.getElementById('vmTabSearch');
+  if (!searchInput.dataset.bound) { searchInput.addEventListener('input', applyFilter); searchInput.dataset.bound = '1'; }
+  applyFilter();
 }
 
 function renderVendorFaqList() {
