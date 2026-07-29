@@ -5070,7 +5070,7 @@ function openVendorMonitorModal(vendorId) {
     const from = fromEl.value, to = toEl.value;
     const filtered = allBatches.filter(b => (!from || (b.ship_date && b.ship_date >= from)) && (!to || (b.ship_date && b.ship_date <= to)));
     document.getElementById('vmCount').textContent = `${filtered.length}건`;
-    renderBatchListTable(document.getElementById('vendorMonitorTable'), filtered);
+    renderBatchListTable(document.getElementById('vendorMonitorTable'), filtered, false);
   }
   fromEl.onchange = apply;
   toEl.onchange = apply;
