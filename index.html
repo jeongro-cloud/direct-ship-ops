@@ -757,10 +757,19 @@
 
   <!-- TARGETS (예상매출 vs 실제매출 vs 판매수량 모니터링) -->
   <section id="panel-targets" class="panel">
+    <div class="toolbar" style="margin-bottom:12px;">
+      <span style="font-size:12px; color:var(--muted);">연도:</span>
+      <select id="targetYearFilter"><option value="">전체 연도</option></select>
+      <span style="font-size:12px; color:var(--muted);">기간:</span>
+      <select id="targetStartMonthFilter"></select>
+      <span style="color:var(--muted); font-size:12px;">~</span>
+      <select id="targetEndMonthFilter"></select>
+      <button id="targetPeriodClear" style="border:1px solid var(--border); background:#fff; border-radius:6px; padding:6px 10px; font-size:11.5px; cursor:pointer;">기간 초기화</button>
+    </div>
     <div class="kpis" id="targetKpiRow"></div>
     <div class="card">
       <h3>월별 목표매출 vs 실제매출 (USD) &amp; 판매수량</h3>
-      <div class="desc">목표매출(target_revenue_usd) 대비 실제매출(revenue_total_usd) 달성률과, 오른쪽 축의 총 판매수량(qty_total) 추이입니다.</div>
+      <div class="desc">목표매출(target_revenue_usd) 대비 실제매출(revenue_total_usd) 달성률과, 오른쪽 축의 총 판매수량(qty_total) 추이입니다. 위 연도/기간 선택에 따라 집계됩니다.</div>
       <div class="chart-h"><canvas id="targetChart"></canvas></div>
     </div>
     <div class="card">
@@ -2022,34 +2031,67 @@ function renderOverviewInsights(filtered, keys) {
 
 // ---------------- TARGETS (목표관리: 예상매출/실제매출/판매수량) ----------------
 function renderTargets() {
-  const withTarget = BATCHES.filter(b => b.target_revenue_usd !== null && b.target_revenue_usd !== undefined && Number(b.target_revenue_usd) > 0);
+  const yearSel = document.getElementById('targetYearFilter');
+  const startSel = document.getElementById('targetStartMonthFilter');
+  const endSel = document.getElementById('targetEndMonthFilter');
+
+  // 연도/기간 선택 옵션은 최초 1회만 채운다 (재렌더링 시 중복 추가 방지).
+  if (!yearSel.dataset.bound) {
+    const years = Array.from(new Set(BATCHES.map(b => b.year))).filter(Boolean).sort((a,b)=>a-b);
+    years.forEach(y => { const o=document.createElement('option'); o.value=y; o.textContent=y+'년'; yearSel.appendChild(o); });
+    for (let m=1;m<=12;m++){
+      const o1=document.createElement('option'); o1.value=m; o1.textContent=m+'월'; startSel.appendChild(o1);
+      const o2=document.createElement('option'); o2.value=m; o2.textContent=m+'월'; endSel.appendChild(o2);
+    }
+    startSel.value = '1'; endSel.value = '12';
+    yearSel.onchange = renderTargets;
+    startSel.onchange = renderTargets;
+    endSel.onchange = renderTargets;
+    document.getElementById('targetPeriodClear').onclick = () => { yearSel.value = ''; startSel.value = '1'; endSel.value = '12'; renderTargets(); };
+    yearSel.dataset.bound = '1';
+  }
+
+  const yearFilter = yearSel.value; // '' = 전체 연도
+  const startMonth = Number(startSel.value) || 1;
+  const endMonth = Number(endSel.value) || 12;
+  const scoped = BATCHES.filter(b => {
+    if (yearFilter && String(b.year) !== String(yearFilter)) return false;
+    if (b.month < startMonth || b.month > endMonth) return false;
+    return true;
+  });
+
+  const withTarget = scoped.filter(b => b.target_revenue_usd !== null && b.target_revenue_usd !== undefined && Number(b.target_revenue_usd) > 0);
   const totalTarget = withTarget.reduce((s,b) => s + Number(b.target_revenue_usd), 0);
   const totalActual = withTarget.reduce((s,b) => s + (Number(b.revenue_total_usd) || 0), 0);
   const overallAch = totalTarget ? totalActual/totalTarget : null;
-  const totalQty = BATCHES.reduce((s,b) => s + (Number(b.qty_total) || 0), 0);
+  const totalQty = scoped.reduce((s,b) => s + (Number(b.qty_total) || 0), 0);
   const underCount = withTarget.filter(b => (Number(b.revenue_total_usd)||0) / Number(b.target_revenue_usd) < 0.7).length;
+  const periodNote = (yearFilter ? yearFilter+'년 ' : '전체 연도 ') + (startMonth===1 && endMonth===12 ? '' : `(${startMonth}~${endMonth}월)`);
 
   document.getElementById('targetKpiRow').innerHTML = `
-    <div class="kpi"><div class="label">목표매출 합계 (USD)</div><div class="value">${fmtUsd(totalTarget)}</div><div class="sub">목표 설정 배치 ${withTarget.length}건</div></div>
+    <div class="kpi"><div class="label">목표매출 합계 (USD)</div><div class="value">${fmtUsd(totalTarget)}</div><div class="sub">목표 설정 배치 ${withTarget.length}건 · ${periodNote}</div></div>
     <div class="kpi"><div class="label">실제매출 합계 (USD)</div><div class="value">${fmtUsd(totalActual)}</div><div class="sub">동일 배치 기준</div></div>
     <div class="kpi"><div class="label">전체 달성률</div><div class="value ${achClass(overallAch)}">${fmtPct(overallAch)}</div><div class="sub">실제/목표</div></div>
     <div class="kpi"><div class="label">총 판매수량</div><div class="value">${fmtNum(totalQty)}</div><div class="sub">달성률 70% 미만 ${underCount}건</div></div>
   `;
 
-  const byMonth = {};
-  BATCHES.forEach(b => {
-    const key = b.month;
-    if (!byMonth[key]) byMonth[key] = { target: 0, actual: 0, qty: 0 };
-    byMonth[key].target += Number(b.target_revenue_usd) || 0;
-    byMonth[key].actual += Number(b.revenue_total_usd) || 0;
-    byMonth[key].qty += Number(b.qty_total) || 0;
+  const byKey = {};
+  scoped.forEach(b => {
+    const key = yearFilter ? b.month : periodKey(b);
+    if (!byKey[key]) byKey[key] = { target: 0, actual: 0, qty: 0 };
+    byKey[key].target += Number(b.target_revenue_usd) || 0;
+    byKey[key].actual += Number(b.revenue_total_usd) || 0;
+    byKey[key].qty += Number(b.qty_total) || 0;
   });
-  const months = Object.keys(byMonth).map(Number).sort((a,b)=>a-b);
-  new Chart(document.getElementById('targetChart'), {
-    data: { labels: months.map(m=>m+'월'), datasets: [
-      { type:'bar', label:'목표매출($)', data: months.map(m=>Math.round(byMonth[m].target)), backgroundColor:'#d4d4d8', yAxisID:'y' },
-      { type:'bar', label:'실제매출($)', data: months.map(m=>Math.round(byMonth[m].actual)), backgroundColor:'#b45309', yAxisID:'y' },
-      { type:'line', label:'판매수량', data: months.map(m=>byMonth[m].qty), borderColor:'#2563eb', backgroundColor:'#2563eb', yAxisID:'y1', tension:0.3 }
+  const keys = yearFilter
+    ? Object.keys(byKey).map(Number).sort((a,b)=>a-b)
+    : Object.keys(byKey).sort();
+  const labels = yearFilter ? keys.map(k=>k+'월') : keys.map(labelForKey);
+  makeChart('targetChart', {
+    data: { labels, datasets: [
+      { type:'bar', label:'목표매출($)', data: keys.map(k=>Math.round(byKey[k].target)), backgroundColor:'#d4d4d8', yAxisID:'y' },
+      { type:'bar', label:'실제매출($)', data: keys.map(k=>Math.round(byKey[k].actual)), backgroundColor:'#b45309', yAxisID:'y' },
+      { type:'line', label:'판매수량', data: keys.map(k=>byKey[k].qty), borderColor:'#2563eb', backgroundColor:'#2563eb', yAxisID:'y1', tension:0.3 }
     ]},
     options: { responsive:true, maintainAspectRatio:false, scales: {
       y: { beginAtZero:true, position:'left', title:{display:true, text:'USD'} },
@@ -2057,7 +2099,7 @@ function renderTargets() {
     }}
   });
 
-  const rows = BATCHES.map(b => {
+  const rows = scoped.map(b => {
     const target = Number(b.target_revenue_usd) || null;
     const actual = Number(b.revenue_total_usd) || 0;
     const ach = target ? actual/target : null;
@@ -2065,6 +2107,7 @@ function renderTargets() {
   });
 
   const columns = [
+    { key: 'year', label: '연도', render: r => `<td>${r.year}</td>` },
     { key: 'month', label: '월', render: r => `<td>${r.month}월</td>` },
     { key: 'vendor_name', label: '업체', render: r => `<td>${esc(r.vendor_name)}</td>` },
     { key: 'batch_label', label: '배치명', render: r => `<td>${esc(r.batch_label)}</td>` },
@@ -2081,12 +2124,14 @@ function renderTargets() {
   const tableEl = document.getElementById('targetTable');
   const controller = makeTable(tableEl, columns, rows, { defaultSort: '_ach', defaultDir: 1 });
 
-  const monthSel = document.getElementById('targetMonthFilter');
-  months.forEach(m => { const o=document.createElement('option'); o.value=m; o.textContent=m+'월'; monthSel.appendChild(o); });
+  const monthFilterSel = document.getElementById('targetMonthFilter');
+  monthFilterSel.innerHTML = '<option value="">전체 월</option>';
+  const monthsPresent = Array.from(new Set(scoped.map(b => b.month))).sort((a,b)=>a-b);
+  monthsPresent.forEach(m => { const o=document.createElement('option'); o.value=m; o.textContent=m+'월'; monthFilterSel.appendChild(o); });
 
   function applyFilter() {
     const q = document.getElementById('targetSearch').value.trim().toLowerCase();
-    const month = monthSel.value;
+    const month = monthFilterSel.value;
     const filtered = rows.filter(r => {
       if (month && String(r.month) !== month) return false;
       if (!q) return true;
@@ -2095,8 +2140,8 @@ function renderTargets() {
     controller.setRows(filtered);
     document.getElementById('targetCount').textContent = filtered.length + ' / ' + rows.length + '개 배치';
   }
-  document.getElementById('targetSearch').addEventListener('input', applyFilter);
-  monthSel.addEventListener('change', applyFilter);
+  document.getElementById('targetSearch').oninput = applyFilter;
+  monthFilterSel.onchange = applyFilter;
   applyFilter();
 }
 
