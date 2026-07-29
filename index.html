@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>한국직배송 운영센터</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" crossorigin="anonymous"></script>
 <style>
   :root {
     color-scheme: light;
@@ -785,6 +786,17 @@
       <h3>카테고리별 YoY 추이 (2025 vs 2026, 월별 USD)</h3>
       <div class="chart-h"><canvas id="categoryYoyChart"></canvas></div>
     </div>
+    <div class="card">
+      <h3>카테고리별 수익(마진) 집계 (USD)</h3>
+      <div class="desc">2026년은 배치별 실제 마진율로 계산한 값입니다. 2025년은 마진율 실측 데이터가 없어, 2026년 카테고리 평균 마진율로 추정한 참고값입니다.</div>
+      <div class="table-scroll"><table id="categoryProfitTable"></table></div>
+    </div>
+    <div class="card">
+      <h3>카테고리별 YoY 성장률 (%)</h3>
+      <div class="desc">전년 동월 대비 매출 성장률입니다. 2025년 데이터가 없는 달은 계산하지 않습니다(-).</div>
+      <div class="table-scroll"><table id="categoryYoyPctTable"></table></div>
+      <div class="chart-h" style="margin-top:12px;"><canvas id="categoryYoyPctChart"></canvas></div>
+    </div>
   </section>
 
   <!-- VENDORS -->
@@ -797,10 +809,24 @@
         <option value="STOP">중단</option>
       </select>
       <span class="count" id="vendorCount"></span>
+      <button id="vendorXlsxDownloadBtn" style="border:1px solid var(--border); background:#fff; border-radius:8px; padding:8px 12px; font-size:12px; cursor:pointer;">⬇️ 엑셀 다운로드</button>
+      <button id="vendorXlsxUploadBtn" style="border:1px solid var(--border); background:#fff; border-radius:8px; padding:8px 12px; font-size:12px; cursor:pointer;">⬆️ 엑셀 업로드</button>
+      <input type="file" id="vendorXlsxFileInput" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" style="display:none;" />
+      <span id="vendorXlsxStatus" style="font-size:11px; color:var(--muted);"></span>
       <button id="vendorAddBtn" style="border:none; background:var(--accent); color:#fff; border-radius:8px; padding:8px 14px; font-size:12.5px; font-weight:700; cursor:pointer;">+ 새 업체 추가</button>
     </div>
     <div class="table-scroll"><table id="vendorTable"></table></div>
     <div class="footnote">2. 업체 리스트 시트 기준 임포트 (93개 업체) · 상태/담당자/결제조건 포함</div>
+
+    <div class="card" style="margin-top:16px;">
+      <h3>업체별 수익 분석</h3>
+      <div class="desc">2026년 배치 데이터 기준 업체별 매출·상세원가(공급가·DHL운임·카드수수료·관세및수수료)·배송비·수익·내부 마진율을 한 번에 볼 수 있는 시트입니다. 열 제목을 클릭하면 정렬됩니다.</div>
+      <div class="toolbar">
+        <input type="text" id="vendorProfitSearch" placeholder="업체명 검색" />
+        <span class="count" id="vendorProfitCount"></span>
+      </div>
+      <div class="table-scroll wide"><table id="vendorProfitTable"></table></div>
+    </div>
   </section>
 
   <!-- SKUS -->
@@ -821,6 +847,10 @@
         <option value="STOP">STOP</option>
       </select>
       <span class="count" id="skuCount"></span>
+      <button id="skuXlsxDownloadBtn" style="border:1px solid var(--border); background:#fff; border-radius:8px; padding:8px 12px; font-size:12px; cursor:pointer;">⬇️ 엑셀 다운로드</button>
+      <button id="skuXlsxUploadBtn" style="border:1px solid var(--border); background:#fff; border-radius:8px; padding:8px 12px; font-size:12px; cursor:pointer;">⬆️ 엑셀 업로드</button>
+      <input type="file" id="skuXlsxFileInput" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" style="display:none;" />
+      <span id="skuXlsxStatus" style="font-size:11px; color:var(--muted);"></span>
       <button id="skuAddBtn" style="border:none; background:var(--accent); color:#fff; border-radius:8px; padding:8px 14px; font-size:12.5px; font-weight:700; cursor:pointer;">+ 새 SKU 추가</button>
     </div>
     <div class="table-scroll"><table id="skuTable"></table></div>
@@ -838,6 +868,10 @@
       <input type="date" id="batchDateTo" title="출고일 종료(일단위 조회)" />
       <button id="batchDateClear" style="border:1px solid var(--border); background:#fff; border-radius:6px; padding:6px 10px; font-size:11.5px; cursor:pointer;">날짜 초기화</button>
       <span class="count" id="batchCount"></span>
+      <button id="batchXlsxDownloadBtn" style="border:1px solid var(--border); background:#fff; border-radius:8px; padding:8px 12px; font-size:12px; cursor:pointer;">⬇️ 엑셀 다운로드</button>
+      <button id="batchXlsxUploadBtn" style="border:1px solid var(--border); background:#fff; border-radius:8px; padding:8px 12px; font-size:12px; cursor:pointer;">⬆️ 엑셀 업로드</button>
+      <input type="file" id="batchXlsxFileInput" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" style="display:none;" />
+      <span id="batchXlsxStatus" style="font-size:11px; color:var(--muted);"></span>
       <button id="batchAddBtn" style="border:none; background:var(--accent); color:#fff; border-radius:8px; padding:8px 14px; font-size:12.5px; font-weight:700; cursor:pointer;">+ 새 배치 추가</button>
     </div>
     <div class="table-scroll wide"><table id="batchTable"></table></div>
@@ -853,13 +887,12 @@
     </div>
 
     <div class="card" id="csvUploadCard">
-      <h3>엑셀(CSV)로 배치 데이터 업로드</h3>
-      <div class="desc">이 화면은 웹 브라우저 내부에서 실행되는 특성상 .xlsx 파일을 직접 열 수는 없고, <b>CSV 형식</b>만 업로드할 수 있습니다. 엑셀에서 "다른 이름으로 저장 → CSV" 로 저장한 뒤 올려주세요. 먼저 템플릿을 받아 형식에 맞춰 채워주시면 됩니다.
-      (복잡한 .xlsx 원본 파일은 채팅으로 올려주시면 제가 직접 변환해서 반영해 드릴 수도 있습니다.)</div>
+      <h3>엑셀로 배치 데이터 업로드</h3>
+      <div class="desc">아래 템플릿을 받아 형식에 맞춰 채운 뒤, <b>엑셀(.xlsx) 파일을 그대로</b> 업로드하시면 됩니다 (CSV 파일도 계속 지원합니다).</div>
       <div class="toolbar">
-        <button id="downloadTemplateBtn" style="border:1px solid var(--border); background:#fff; border-radius:8px; padding:7px 12px; font-size:12.5px; cursor:pointer;">📄 CSV 템플릿 다운로드 (예시 포함)</button>
-        <label for="csvFileInput" style="border:1px solid var(--border); background:#fff; border-radius:8px; padding:7px 12px; font-size:12.5px; cursor:pointer;">📤 CSV 파일 선택</label>
-        <input type="file" id="csvFileInput" accept=".csv,text/csv" style="display:none;" />
+        <button id="downloadTemplateBtn" style="border:1px solid var(--border); background:#fff; border-radius:8px; padding:7px 12px; font-size:12.5px; cursor:pointer;">📄 엑셀 템플릿 다운로드 (예시 포함)</button>
+        <label for="csvFileInput" style="border:1px solid var(--border); background:#fff; border-radius:8px; padding:7px 12px; font-size:12.5px; cursor:pointer;">📤 파일 선택 (엑셀/CSV)</label>
+        <input type="file" id="csvFileInput" accept=".csv,text/csv,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" style="display:none;" />
         <span class="count" id="csvStatus"></span>
       </div>
       <div id="csvPreviewWrap" style="display:none;">
@@ -873,10 +906,12 @@
 
     <div class="card">
       <h3>전체 배치 데이터</h3>
-      <div class="desc">행을 클릭하면 해당 배치의 전체 항목을 자세히 볼 수 있습니다.</div>
+      <div class="desc">수량·매출·목표·취소·클레임·마진율은 표 안 칸을 바로 클릭해 수정하면 즉시 저장됩니다(다이렉트 변경). 그 외 항목(업체·출고일 등)을 고치거나 전체 항목을 보려면 행을 클릭하세요.</div>
       <div class="toolbar">
         <input type="text" id="fullSearch" placeholder="업체·배치명 검색" />
         <select id="fullMonthFilter"><option value="">전체 월</option></select>
+        <button id="fullXlsxDownloadBtn" style="border:1px solid var(--border); background:#fff; border-radius:8px; padding:7px 12px; font-size:12px; cursor:pointer;">⬇️ 전체 데이터 엑셀 다운로드</button>
+        <button id="fullAddBtn" style="border:none; background:var(--accent); color:#fff; border-radius:8px; padding:7px 12px; font-size:12.5px; font-weight:700; cursor:pointer;">+ 새 배치 추가</button>
         <span class="count" id="fullCount"></span>
       </div>
       <div class="table-scroll wide"><table id="fullTable"></table></div>
@@ -1489,6 +1524,107 @@ function batchFields() {
   ];
 }
 
+// ---------------- 범용 엑셀 다운로드/업로드 (업체·SKU·판매현황 등 마스터 데이터 공용) ----------------
+// fields(위 *_FIELDS/*Fields()) 정의를 그대로 재사용해 엑셀 컬럼 헤더/타입 변환 규칙을 만든다.
+function genericXlsxExport(rows, fields, idField, filename) {
+  const data = (rows || []).map(r => {
+    const o = {};
+    if (idField) o['ID'] = r[idField] || '';
+    fields.forEach(f => {
+      let v = r[f.key];
+      if (f.type === 'checkbox') v = (v === true || v === 't' || v === 'true') ? 'O' : '';
+      o[f.label] = (v === null || v === undefined) ? '' : v;
+    });
+    return o;
+  });
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+  XLSX.writeFile(wb, filename);
+}
+
+function genericXlsxRowToFields(raw, fields) {
+  const out = {};
+  fields.forEach(f => {
+    let v = raw[f.label];
+    if (f.type === 'number') {
+      v = (v === '' || v === null || v === undefined) ? null : Number(v);
+      if (typeof v === 'number' && isNaN(v)) v = null;
+    } else if (f.type === 'checkbox') {
+      v = (v === 'O' || v === true || String(v).trim().toUpperCase() === 'TRUE' || v === 1 || v === '1');
+    } else if (f.key === 'vendor_id') {
+      // 업체 ID 대신 업체명을 적어도 자동으로 매칭해준다.
+      if (v && !VENDORS.some(vd => String(vd.id) === String(v))) {
+        const match = VENDORS.find(vd => vd.name === String(v).trim());
+        if (match) v = match.id;
+      }
+      if (v === '') v = null;
+    } else {
+      v = (v === '' || v === undefined || v === null) ? null : String(v).trim();
+    }
+    out[f.key] = v;
+  });
+  return out;
+}
+
+async function genericXlsxImport(file, opts) {
+  // opts: { fields, upsertAction, onDone, statusEl }
+  const statusEl = opts.statusEl;
+  try {
+    if (statusEl) statusEl.textContent = '읽는 중...';
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array', cellDates: true });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+    if (!rows.length) { if (statusEl) statusEl.textContent = '업로드할 데이터가 없습니다.'; return; }
+    if (statusEl) statusEl.textContent = `${rows.length}건 처리 중...`;
+    let ok = 0, fail = 0;
+    for (const raw of rows) {
+      try {
+        const id = (raw['ID'] !== undefined && raw['ID'] !== '') ? raw['ID'] : undefined;
+        const fields = genericXlsxRowToFields(raw, opts.fields);
+        await callApi(opts.upsertAction, { id, fields });
+        ok++;
+      } catch (e) {
+        console.error('xlsx row upsert failed', e, raw);
+        fail++;
+      }
+    }
+    if (statusEl) statusEl.textContent = `완료: ${ok}건 저장${fail ? `, ${fail}건 실패(콘솔 확인)` : ''}`;
+    if (opts.onDone) await opts.onDone();
+  } catch (e) {
+    console.error('엑셀 업로드 실패', e);
+    if (statusEl) statusEl.textContent = '업로드 실패: ' + (e.message || e);
+  }
+}
+
+// prefix + 'XlsxDownloadBtn' / 'XlsxUploadBtn' / 'XlsxFileInput' / 'XlsxStatus' 요소를 자동으로 찾아 연결한다.
+function wireXlsxTools(prefix, opts) {
+  // opts: { getRows, fields, idField, upsertAction, filename, onDone }
+  const dlBtn = document.getElementById(prefix + 'XlsxDownloadBtn');
+  const upBtn = document.getElementById(prefix + 'XlsxUploadBtn');
+  const fileInput = document.getElementById(prefix + 'XlsxFileInput');
+  const statusEl = document.getElementById(prefix + 'XlsxStatus');
+  if (dlBtn && !dlBtn.dataset.bound) {
+    dlBtn.addEventListener('click', () => {
+      const fields = typeof opts.fields === 'function' ? opts.fields() : opts.fields;
+      genericXlsxExport(opts.getRows(), fields, opts.idField, opts.filename);
+    });
+    dlBtn.dataset.bound = '1';
+  }
+  if (upBtn && fileInput && !upBtn.dataset.bound) {
+    upBtn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const fields = typeof opts.fields === 'function' ? opts.fields() : opts.fields;
+      await genericXlsxImport(file, { fields, upsertAction: opts.upsertAction, onDone: opts.onDone, statusEl });
+      fileInput.value = '';
+    });
+    upBtn.dataset.bound = '1';
+  }
+}
+
 // 캘린더 칩(운영계획)을 클릭해 바로 수정할 수 있도록 하는 범용 편집 모달용 필드 정의.
 function planFields() {
   return [
@@ -2005,6 +2141,60 @@ function renderCategory() {
     type: 'line',
     data: { labels: monthLabels.slice(0,7), datasets },
     options: { responsive:true, maintainAspectRatio:false, scales: { y: { beginAtZero:true, title:{display:true,text:'USD'} } } }
+  });
+
+  renderCategoryProfitAndGrowth(cats, live2026, hist2025, vendorCategory, monthLabels);
+}
+
+// 카테고리별 수익(마진) 집계 + YoY 성장률(%) — renderCategory()에서 이어서 호출된다.
+// 2026 이익은 배치별 실제 마진율(margin_rate)로 계산, 2025는 마진 실측치가 없어 2026 카테고리 평균 마진율로 추정한다.
+function renderCategoryProfitAndGrowth(cats, live2026, hist2025, vendorCategory, monthLabels) {
+  const profit2026 = {}; cats.forEach(c => profit2026[c] = Array(12).fill(0));
+  const marginWeightedSum = {}, marginWeightTotal = {};
+  cats.forEach(c => { marginWeightedSum[c] = 0; marginWeightTotal[c] = 0; });
+  BATCHES.forEach(b => {
+    const cat = vendorCategory[b.vendor_name];
+    if (!cat || !profit2026[cat]) return;
+    const rev = Number(b.revenue_total_usd) || 0;
+    const margin = (b.margin_rate !== null && b.margin_rate !== undefined) ? Number(b.margin_rate) : null;
+    if (margin !== null) {
+      profit2026[cat][b.month - 1] += rev * margin;
+      marginWeightedSum[cat] += rev * margin;
+      marginWeightTotal[cat] += rev;
+    }
+  });
+  const avgMarginByCat = {};
+  cats.forEach(c => { avgMarginByCat[c] = marginWeightTotal[c] ? marginWeightedSum[c] / marginWeightTotal[c] : null; });
+
+  const profit2025 = {};
+  cats.forEach(c => { profit2025[c] = hist2025[c].map(v => avgMarginByCat[c] !== null ? v * avgMarginByCat[c] : null); });
+
+  let profitHtml = '<thead><tr><th>카테고리</th><th>연도</th>' + monthLabels.map(m => `<th class="num">${m}</th>`).join('') + '<th class="num">합계</th></tr></thead><tbody>';
+  cats.forEach(cat => {
+    const p26 = profit2026[cat], p25 = profit2025[cat];
+    const p26Total = p26.reduce((s, v) => s + v, 0);
+    const p25Total = p25.reduce((s, v) => s + (v || 0), 0);
+    const marginNote = avgMarginByCat[cat] !== null ? ` (평균 마진율 ${fmtPct(avgMarginByCat[cat])})` : '';
+    profitHtml += `<tr><td rowspan="2" style="font-weight:700">${esc(cat)}${cat === cats[0] ? '' : ''}</td><td>2026${marginNote}</td>` + p26.map(v => `<td class="num">${v ? fmtUsd(v) : '-'}</td>`).join('') + `<td class="num" style="font-weight:700">${fmtUsd(p26Total)}</td></tr>`;
+    profitHtml += `<tr><td style="color:var(--muted)">2025(추정)</td>` + p25.map(v => `<td class="num" style="color:var(--muted)">${v ? fmtUsd(v) : '-'}</td>`).join('') + `<td class="num" style="color:var(--muted)">${fmtUsd(p25Total)}</td></tr>`;
+  });
+  document.getElementById('categoryProfitTable').innerHTML = profitHtml + '</tbody>';
+
+  // YoY 성장률(%) = (2026 - 2025) / 2025 * 100, 2025 데이터가 없는 달은 계산하지 않음(null)
+  let growthHtml = '<thead><tr><th>카테고리</th>' + monthLabels.slice(0, 7).map(m => `<th class="num">${m}</th>`).join('') + '</tr></thead><tbody>';
+  const growthDatasets = [];
+  const palette2 = ['#b45309', '#2563eb', '#15803d', '#a855f7', '#dc2626'];
+  cats.forEach((cat, i) => {
+    const l = live2026[cat], h = hist2025[cat];
+    const growth = l.slice(0, 7).map((v, idx) => (h[idx] ? ((v - h[idx]) / h[idx] * 100) : null));
+    growthHtml += `<tr><td style="font-weight:700">${esc(cat)}</td>` + growth.map(v => `<td class="num ${v === null ? '' : marginClass(v)}">${v === null ? '-' : (v >= 0 ? '+' : '') + v.toFixed(1) + '%'}</td>`).join('') + '</tr>';
+    growthDatasets.push({ label: cat, data: growth.map(v => v === null ? null : Math.round(v * 10) / 10), borderColor: palette2[i % palette2.length], backgroundColor: palette2[i % palette2.length], tension: 0.3, spanGaps: false });
+  });
+  document.getElementById('categoryYoyPctTable').innerHTML = growthHtml + '</tbody>';
+  new Chart(document.getElementById('categoryYoyPctChart'), {
+    type: 'line',
+    data: { labels: monthLabels.slice(0, 7), datasets: growthDatasets },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { y: { title: { display: true, text: '전년 대비 성장률(%)' } } } }
   });
 }
 
@@ -3118,6 +3308,76 @@ function renderVendors() {
     }));
     addBtn.dataset.bound = '1';
   }
+  wireXlsxTools('vendor', {
+    getRows: () => VENDORS,
+    fields: VENDOR_FIELDS,
+    idField: 'id',
+    upsertAction: 'upsert_vendor',
+    filename: `업체목록_${new Date().toISOString().slice(0,10)}.xlsx`,
+    onDone: refreshVendors,
+  });
+  renderVendorProfitAnalysis();
+}
+
+// 업체별 수익 분석 시트 — 2026 배치(BATCHES) 데이터를 vendor_id 기준으로 합산해
+// 매출·상세원가(공급가/DHL운임/카드수수료/관세및수수료)·배송비·수익($)·내부 마진율을 한 번에 보여준다.
+function renderVendorProfitAnalysis() {
+  const byVendor = {};
+  BATCHES.forEach(b => {
+    const key = b.vendor_id || b.vendor_name;
+    if (!key) return;
+    if (!byVendor[key]) byVendor[key] = {
+      name: b.vendor_name, category: null,
+      revenue: 0, supply: 0, dhl: 0, cardFee: 0, customsFee: 0, costUsd: 0, batchCount: 0,
+      marginWeightedSum: 0, marginWeightTotal: 0,
+    };
+    const acc = byVendor[key];
+    const rev = Number(b.revenue_total_usd) || 0;
+    acc.revenue += rev;
+    acc.supply += Number(b.supply_total_krw) || 0;
+    acc.dhl += Number(b.dhl_freight_krw) || 0;
+    acc.cardFee += Number(b.card_fee_krw) || 0;
+    acc.customsFee += Number(b.customs_fee_krw) || 0;
+    acc.costUsd += Number(b.cost_total_usd) || 0;
+    acc.batchCount += 1;
+    if (b.margin_rate !== null && b.margin_rate !== undefined) {
+      acc.marginWeightedSum += rev * Number(b.margin_rate);
+      acc.marginWeightTotal += rev;
+    }
+  });
+  VENDORS.forEach(v => { if (byVendor[v.id]) byVendor[v.id].category = v.category; });
+
+  const rows = Object.values(byVendor).map(acc => {
+    const profitUsd = acc.revenue - acc.costUsd;
+    const marginPct = acc.marginWeightTotal ? acc.marginWeightedSum / acc.marginWeightTotal : (acc.revenue ? profitUsd / acc.revenue : null);
+    return { ...acc, profitUsd, marginPct };
+  });
+
+  const columns = [
+    { key: 'name', label: '업체명', render: r => `<td>${esc(r.name)}</td>` },
+    { key: 'category', label: '카테고리', render: r => `<td>${esc(r.category) || '-'}</td>` },
+    { key: 'batchCount', label: '배치수', render: r => `<td class="num">${r.batchCount}</td>` },
+    { key: 'revenue', label: '매출($)', render: r => `<td class="num" style="font-weight:700">${fmtUsd(r.revenue)}</td>` },
+    { key: 'supply', label: '공급가총합(₩)', render: r => `<td class="num">${fmtKrw(r.supply)}</td>` },
+    { key: 'dhl', label: '배송비 · DHL운임(₩)', render: r => `<td class="num">${fmtKrw(r.dhl)}</td>` },
+    { key: 'cardFee', label: '카드수수료(₩)', render: r => `<td class="num">${fmtKrw(r.cardFee)}</td>` },
+    { key: 'customsFee', label: '관세및수수료(₩)', render: r => `<td class="num">${fmtKrw(r.customsFee)}</td>` },
+    { key: 'costUsd', label: '총원가($)', render: r => `<td class="num">${fmtUsd(r.costUsd)}</td>` },
+    { key: 'profitUsd', label: '수익($)', render: r => `<td class="num ${marginClass(r.profitUsd)}" style="font-weight:700">${fmtUsd(r.profitUsd)}</td>` },
+    { key: 'marginPct', label: '내부 마진율', render: r => `<td class="num ${r.marginPct!==null?marginClass(r.marginPct):''}">${r.marginPct!==null?fmtPct(r.marginPct):'-'}</td>` },
+  ];
+  const tableEl = document.getElementById('vendorProfitTable');
+  const controller = makeTable(tableEl, columns, rows, { defaultSort: 'revenue', defaultDir: -1 });
+
+  function applyFilter() {
+    const q = document.getElementById('vendorProfitSearch').value.trim().toLowerCase();
+    const filtered = rows.filter(r => !q || (r.name || '').toLowerCase().includes(q));
+    controller.setRows(filtered);
+    document.getElementById('vendorProfitCount').textContent = filtered.length + ' / ' + rows.length + '개 업체';
+  }
+  const searchEl = document.getElementById('vendorProfitSearch');
+  if (!searchEl.dataset.bound) { searchEl.addEventListener('input', applyFilter); searchEl.dataset.bound = '1'; }
+  applyFilter();
 }
 
 async function openVendorEditModal(row) {
@@ -3433,6 +3693,14 @@ function renderSkus() {
     }));
     addBtn.dataset.bound = '1';
   }
+  wireXlsxTools('sku', {
+    getRows: () => SKUS,
+    fields: skuFields,
+    idField: 'id',
+    upsertAction: 'upsert_sku',
+    filename: `SKU목록_${new Date().toISOString().slice(0,10)}.xlsx`,
+    onDone: refreshSkus,
+  });
 }
 
 async function openSkuEditModal(row) {
@@ -3506,6 +3774,19 @@ function renderBatches() {
     }));
     addBtn.dataset.bound = '1';
   }
+  wireXlsxTools('batch', {
+    getRows: () => BATCHES,
+    fields: batchFields,
+    idField: 'id',
+    upsertAction: 'upsert_batch',
+    filename: `배치데이터_${new Date().toISOString().slice(0,10)}.xlsx`,
+    onDone: async () => {
+      const { rows: batches } = await callApi('list_batches');
+      BATCHES = batches || [];
+      renderBatches();
+      renderFullData();
+    },
+  });
 }
 
 // ---------------- FULL DATA (원본 시트 전체 컬럼) ----------------
@@ -3532,24 +3813,25 @@ function renderFullData() {
     { key: 'card_fee_krw', label: '카드수수료', render: r => `<td class="num">${fmtKrw(r.card_fee_krw)}</td>` },
     { key: 'customs_fee_krw', label: '관세 및 수수료', render: r => `<td class="num">${fmtKrw(r.customs_fee_krw)}</td>` },
     { key: '_share', label: '점유(월매출대비)', render: r => `<td class="num">${r._share!==null?fmtPct(r._share):'-'}</td>` },
-    { key: 'qty_online', label: '온라인(수량)', render: r => `<td class="num">${r.qty_online ?? '-'}</td>` },
-    { key: 'qty_store', label: '직매장(수량)', render: r => `<td class="num">${r.qty_store ?? '-'}</td>` },
+    { key: 'qty_online', label: '온라인(수량)', render: r => fullInlineNumCell(r, 'qty_online') },
+    { key: 'qty_store', label: '직매장(수량)', render: r => fullInlineNumCell(r, 'qty_store') },
     { key: 'qty_total', label: '총판매', render: r => `<td class="num">${r.qty_total ?? '-'}</td>` },
     { key: 'cost_total_krw', label: '총원가', render: r => `<td class="num">${fmtKrw(r.cost_total_krw)}</td>` },
     { key: 'cost_total_usd', label: '달러환산(원가)', render: r => `<td class="num">${fmtUsd(r.cost_total_usd)}</td>` },
     { key: 'revenue_online_usd', label: '온라인($)', render: r => `<td class="num">${fmtUsd(r.revenue_online_usd)}</td>` },
     { key: 'revenue_store_usd', label: '직매장($)', render: r => `<td class="num">${fmtUsd(r.revenue_store_usd)}</td>` },
-    { key: 'revenue_total_usd', label: '총매출($)', render: r => `<td class="num">${fmtUsd(r.revenue_total_usd)}</td>` },
+    { key: 'revenue_total_usd', label: '총매출($)', render: r => fullInlineNumCell(r, 'revenue_total_usd') },
     { key: 'revenue_total_krw', label: '원화환산', render: r => `<td class="num">${fmtKrw(r.revenue_total_krw)}</td>` },
-    { key: 'target_revenue_usd', label: '목표매출', render: r => `<td class="num">${fmtUsd(r.target_revenue_usd)}</td>` },
-    { key: 'cancel_count', label: '취소건', render: r => `<td class="num">${r.cancel_count ?? '-'}</td>` },
+    { key: 'target_revenue_usd', label: '목표매출', render: r => fullInlineNumCell(r, 'target_revenue_usd') },
+    { key: 'cancel_count', label: '취소건', render: r => fullInlineNumCell(r, 'cancel_count') },
     { key: 'cancel_note', label: '취소내용', render: r => `<td>${esc(r.cancel_note)}</td>` },
-    { key: 'claim_count', label: '클레임건', render: r => `<td class="num">${r.claim_count ?? '-'}</td>` },
-    { key: 'claim_amount_usd', label: '클레임금액', render: r => `<td class="num">${fmtUsd(r.claim_amount_usd)}</td>` },
-    { key: 'margin_rate', label: '마진율', render: r => `<td class="num ${marginClass(r.margin_rate)}">${fmtPct(r.margin_rate)}</td>` },
+    { key: 'claim_count', label: '클레임건', render: r => fullInlineNumCell(r, 'claim_count') },
+    { key: 'claim_amount_usd', label: '클레임금액', render: r => fullInlineNumCell(r, 'claim_amount_usd') },
+    { key: 'margin_rate', label: '마진율(0~1)', render: r => fullInlineNumCell(r, 'margin_rate', { step: '0.01', cls: marginClass(r.margin_rate) }) },
   ];
   const tableEl = document.getElementById('fullTable');
-  const controller = makeTable(tableEl, columns, rows, { defaultSort: 'month', defaultDir: -1, onRowClick: showRowDetail });
+  const controller = makeTable(tableEl, columns, rows, { defaultSort: 'month', defaultDir: -1, onRowClick: openBatchEditFromRow });
+  wireFullTableInlineEdits();
 
   const monthSel = document.getElementById('fullMonthFilter');
   const months = Array.from(new Set(BATCHES.map(b => b.month))).sort((a,b)=>a-b);
@@ -3569,6 +3851,80 @@ function renderFullData() {
   document.getElementById('fullSearch').addEventListener('input', applyFilter);
   monthSel.addEventListener('change', applyFilter);
   applyFilter();
+
+  const addBtn = document.getElementById('fullAddBtn');
+  if (!addBtn.dataset.bound) {
+    addBtn.addEventListener('click', () => {
+      openEditModal({
+        title: '새 배치 추가', table: 'batches', idField: 'id', row: null, fields: batchFields(),
+        onSaved: async () => {
+          const { rows: batches } = await callApi('list_batches');
+          BATCHES = batches || [];
+          renderBatches();
+          renderFullData();
+        }
+      });
+    });
+    addBtn.dataset.bound = '1';
+  }
+  const fullDlBtn = document.getElementById('fullXlsxDownloadBtn');
+  if (fullDlBtn && !fullDlBtn.dataset.bound) {
+    fullDlBtn.addEventListener('click', () => genericXlsxExport(BATCHES, batchFields(), 'id', `전체데이터_${new Date().toISOString().slice(0,10)}.xlsx`));
+    fullDlBtn.dataset.bound = '1';
+  }
+}
+
+// 자주 바뀌는 숫자 필드는 모달 없이 표 칸에서 바로 입력→저장(다이렉트 변경)할 수 있게 한다.
+function fullInlineNumCell(r, field, opts) {
+  opts = opts || {};
+  const val = r[field];
+  return `<td class="num"><input type="number" class="fullInlineInput ${opts.cls || ''}" data-id="${r.id}" data-field="${field}" ${opts.step ? `step="${opts.step}"` : ''} value="${val === null || val === undefined ? '' : val}" style="width:${opts.width || 84}px; text-align:right; padding:3px 5px; border:1px solid var(--border); border-radius:5px; font-size:11.5px;" /></td>`;
+}
+
+// 캡처 단계(true)에서 가로채야 한다 — makeTable의 onRowClick(행 클릭 시 수정 모달 열기)이 tr에 등록되어 있어,
+// 버블 단계에서만 막으면 tr의 리스너가 먼저 실행되어 수정 모달이 함께 열려버린다.
+function wireFullTableInlineEdits() {
+  const table = document.getElementById('fullTable');
+  if (table.dataset.inlineBound) return;
+  table.addEventListener('click', (e) => { if (e.target.closest('.fullInlineInput')) e.stopPropagation(); }, true);
+  table.addEventListener('change', async (e) => {
+    const inp = e.target.closest('.fullInlineInput');
+    if (!inp) return;
+    e.stopPropagation();
+    const id = inp.dataset.id, field = inp.dataset.field;
+    const row = BATCHES.find(b => String(b.id) === String(id));
+    if (!row) return;
+    const val = inp.value === '' ? null : Number(inp.value);
+    inp.style.borderColor = 'var(--accent)';
+    try {
+      await callApi('upsert_batch', { id, fields: { [field]: val } });
+      row[field] = val;
+    } catch (err) {
+      console.error('inline batch save failed', err);
+      alert('저장 중 오류가 발생했습니다.');
+    } finally {
+      setTimeout(() => { inp.style.borderColor = ''; }, 600);
+    }
+  });
+  table.dataset.inlineBound = '1';
+}
+
+// 행 클릭 시 읽기전용 상세보기를 건너뛰고 바로 수정 모달로 이동 — 번거로운 2단계 클릭을 줄인다.
+async function openBatchEditFromRow(row) {
+  if (!row || !row.id) return;
+  const res = await callApi('get_batch_full', { id: row.id });
+  const full = res && res.row;
+  if (!full) return;
+  openEditModal({
+    title: '배치 수정 — ' + (row.vendor_name || ''),
+    table: 'batches', idField: 'id', row: full, fields: batchFields(),
+    onSaved: async () => {
+      const { rows: batches } = await callApi('list_batches');
+      BATCHES = batches || [];
+      renderBatches();
+      renderFullData();
+    }
+  });
 }
 
 // ---------------- 전체 데이터: 예시 · CSV 업로드 ----------------
@@ -3630,46 +3986,77 @@ function parseCSV(text) {
 
 let CSV_PARSED_ROWS = [];
 
+// xlsx 셀 값(숫자/문자/Date객체)을 문자열로 통일 — parseCSV()가 만드는 배열-of-배열 형태와 동일하게 맞춰서
+// 이후 로직(processParsedRows)을 CSV/엑셀 공용으로 재사용할 수 있게 한다.
+function xlsxCellToStr(v) {
+  if (v === null || v === undefined) return '';
+  if (v instanceof Date) {
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${v.getFullYear()}-${pad(v.getMonth() + 1)}-${pad(v.getDate())}`;
+  }
+  return String(v);
+}
+
+// rows: 배열의 배열([헤더행, 데이터행, ...]) — parseCSV()와 엑셀 파싱 결과 모두 이 형태로 넘어온다.
+function processParsedRows(rows, statusEl) {
+  if (!rows.length) { statusEl.textContent = '파일이 비어있습니다.'; return; }
+  const header = rows[0].map(h => String(h || '').trim());
+  const missing = BATCH_CSV_COLUMNS.filter(c => !header.includes(c));
+  if (missing.length) {
+    statusEl.textContent = `템플릿과 열이 다릅니다. 누락된 열: ${missing.join(', ')}`;
+    return;
+  }
+  const dataRows = rows.slice(1).filter(r => r.some(v => String(v || '').trim() !== ''));
+  CSV_PARSED_ROWS = dataRows.map(r => {
+    const obj = {};
+    header.forEach((h, i) => { obj[h] = String(r[i] !== undefined ? r[i] : '').trim(); });
+    return obj;
+  });
+  statusEl.textContent = `${CSV_PARSED_ROWS.length}개 행 인식됨`;
+  const previewCols = ['year','month','vendor_name','batch_label','qty_total','revenue_total_usd','margin_rate'];
+  const previewTable = document.getElementById('csvPreviewTable');
+  previewTable.innerHTML = '<thead><tr>' + previewCols.map(c => `<th>${FIELD_LABELS[c]||c}</th>`).join('') + '</tr></thead>' +
+    '<tbody>' + CSV_PARSED_ROWS.slice(0, 20).map(r => '<tr>' + previewCols.map(c => `<td>${esc(r[c])}</td>`).join('') + '</tr>').join('') + '</tbody>';
+  document.getElementById('csvPreviewWrap').style.display = 'block';
+}
+
 function initFullDataCsvUpload() {
   document.getElementById('downloadTemplateBtn').addEventListener('click', () => {
-    const csv = buildCsvTemplate();
-    const blob = new Blob(["﻿" + csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = '배치데이터_업로드_템플릿.csv';
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    const ws = XLSX.utils.json_to_sheet([EXAMPLE_ROW], { header: BATCH_CSV_COLUMNS });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '배치데이터');
+    XLSX.writeFile(wb, '배치데이터_업로드_템플릿.xlsx');
   });
 
   document.getElementById('csvFileInput').addEventListener('change', (e) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
     const statusEl = document.getElementById('csvStatus');
-    const reader = new FileReader();
-    reader.onload = () => {
-      const text = String(reader.result || '');
-      const rows = parseCSV(text);
-      if (!rows.length) { statusEl.textContent = '파일이 비어있습니다.'; return; }
-      const header = rows[0].map(h => h.trim());
-      const missing = BATCH_CSV_COLUMNS.filter(c => !header.includes(c));
-      if (missing.length) {
-        statusEl.textContent = `템플릿과 열이 다릅니다. 누락된 열: ${missing.join(', ')}`;
-        return;
-      }
-      const dataRows = rows.slice(1).filter(r => r.some(v => v.trim() !== ''));
-      CSV_PARSED_ROWS = dataRows.map(r => {
-        const obj = {};
-        header.forEach((h, i) => { obj[h] = (r[i] !== undefined ? r[i] : '').trim(); });
-        return obj;
-      });
-      statusEl.textContent = `${CSV_PARSED_ROWS.length}개 행 인식됨`;
-      const previewCols = ['year','month','vendor_name','batch_label','qty_total','revenue_total_usd','margin_rate'];
-      const previewTable = document.getElementById('csvPreviewTable');
-      previewTable.innerHTML = '<thead><tr>' + previewCols.map(c => `<th>${FIELD_LABELS[c]||c}</th>`).join('') + '</tr></thead>' +
-        '<tbody>' + CSV_PARSED_ROWS.slice(0, 20).map(r => '<tr>' + previewCols.map(c => `<td>${esc(r[c])}</td>`).join('') + '</tr>').join('') + '</tbody>';
-      document.getElementById('csvPreviewWrap').style.display = 'block';
-    };
-    reader.readAsText(file, 'utf-8');
+    const name = file.name.toLowerCase();
+    if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const data = new Uint8Array(reader.result);
+          const wb = XLSX.read(data, { type: 'array', cellDates: true });
+          const sheet = wb.Sheets[wb.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: '' }).map(r => r.map(xlsxCellToStr));
+          processParsedRows(rows, statusEl);
+        } catch (err) {
+          console.error('xlsx parse error', err);
+          statusEl.textContent = '엑셀 파일을 읽는 중 오류가 발생했습니다.';
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const text = String(reader.result || '');
+        const rows = parseCSV(text);
+        processParsedRows(rows, statusEl);
+      };
+      reader.readAsText(file, 'utf-8');
+    }
   });
 
   document.getElementById('csvCancelBtn').addEventListener('click', () => {
@@ -4575,7 +4962,9 @@ function wireLaunchForm() {
 
 // vendor: 업체 row(name/category/status/payment_terms 포함), batches: 해당 업체 배치 전체, wrap: 렌더할 DOM 엘리먼트.
 // 제조사 포털 화면과 관리자용 "업체별 판매 모니터링" 모달이 이 함수 하나를 공유한다.
-function renderVendorBannerInto(vendor, batches, wrap) {
+// showMargin: 마진율은 내부 원가 정보를 유추할 수 있어 제조사 본인에게는 숨기고(false), 관리자 모니터링 화면에서는 보여준다(true, 기본값).
+function renderVendorBannerInto(vendor, batches, wrap, showMargin) {
+  if (showMargin === undefined) showMargin = true;
   if (!vendor) { wrap.innerHTML = '<div class="empty">업체 정보를 찾을 수 없습니다.</div>'; return; }
   if (!batches.length) {
     wrap.innerHTML = `<div class="vbanner"><div class="vbanner-top"><div><div class="vbanner-name">${esc(vendor.name)}</div>
@@ -4610,22 +4999,24 @@ function renderVendorBannerInto(vendor, batches, wrap) {
       <div class="vbanner-stats">
         <div><div class="vstat-label">${latestYear}년 ${latestMonth}월 매출</div><div class="vstat-value">${fmtUsd(monthRevenue)}</div><div class="vstat-sub">목표 ${fmtUsd(monthTarget)}</div></div>
         <div><div class="vstat-label">목표 달성률</div><div class="vstat-value">${ach!==null?fmtPct(ach):'-'}</div><div class="vstat-sub">${monthQty.toLocaleString()}개 판매</div></div>
-        <div><div class="vstat-label">평균 마진율</div><div class="vstat-value">${marginAvg!==null?fmtPct(marginAvg):'-'}</div></div>
+        ${showMargin ? `<div><div class="vstat-label">평균 마진율</div><div class="vstat-value">${marginAvg!==null?fmtPct(marginAvg):'-'}</div></div>` : ''}
         <div><div class="vstat-label">누적 매출</div><div class="vstat-value">${fmtUsd(totalRevenue)}</div><div class="vstat-sub">누적 ${totalQty.toLocaleString()}개</div></div>
       </div>
       ${(cancelSum > 0 || claimSum > 0) ? `<div class="vbanner-alert">⚠️ 이번 달 취소 ${cancelSum}건 · 클레임 ${claimSum}건이 있습니다. 자세한 내용은 담당자에게 문의해주세요.</div>` : ''}
     </div>`;
 }
-function renderVendorBanner() { renderVendorBannerInto(VP_VENDOR, VP_BATCHES, document.getElementById('vendorBannerWrap')); }
+function renderVendorBanner() { renderVendorBannerInto(VP_VENDOR, VP_BATCHES, document.getElementById('vendorBannerWrap'), false); }
 
 // 배치 목록 테이블(제조사 포털 · 관리자 모니터링 모달 공용, 15건 제한 없음 · 출고일 최신순)
-function renderBatchListTable(tableEl, batches) {
+// showMargin: 마진율(내부 원가 유추 가능)은 제조사 본인 화면에서는 숨긴다(false).
+function renderBatchListTable(tableEl, batches, showMargin) {
+  if (showMargin === undefined) showMargin = true;
   if (!batches.length) {
     tableEl.innerHTML = '<tbody><tr><td class="empty">해당 조건의 배치 내역이 없습니다</td></tr></tbody>';
     return;
   }
   const sorted = batches.slice().sort((a, b) => String(b.ship_date || '').localeCompare(String(a.ship_date || '')));
-  tableEl.innerHTML = '<thead><tr><th>년월</th><th>배치</th><th>제품수</th><th>출고일</th><th>수량</th><th>매출($)</th><th>마진율</th></tr></thead>' +
+  tableEl.innerHTML = '<thead><tr><th>년월</th><th>배치</th><th>제품수</th><th>출고일</th><th>수량</th><th>매출($)</th>' + (showMargin ? '<th>마진율</th>' : '') + '</tr></thead>' +
     '<tbody>' + sorted.map(b => `<tr>
       <td>${b.year}.${b.month}</td>
       <td>${esc(b.batch_label)}</td>
@@ -4633,7 +5024,7 @@ function renderBatchListTable(tableEl, batches) {
       <td>${esc(b.ship_date)}</td>
       <td class="num">${b.qty_total ?? '-'}</td>
       <td class="num">${fmtUsd(b.revenue_total_usd)}</td>
-      <td class="num ${marginClass(b.margin_rate)}">${fmtPct(b.margin_rate)}</td>
+      ${showMargin ? `<td class="num ${marginClass(b.margin_rate)}">${fmtPct(b.margin_rate)}</td>` : ''}
     </tr>`).join('') + '</tbody>';
 }
 
@@ -4650,7 +5041,7 @@ function renderVendorBatchTable() {
   const from = fromEl.value, to = toEl.value;
   const filtered = VP_BATCHES.filter(b => (!from || (b.ship_date && b.ship_date >= from)) && (!to || (b.ship_date && b.ship_date <= to)));
   document.getElementById('vpBatchCount').textContent = `${filtered.length}건`;
-  renderBatchListTable(document.getElementById('vendorBatchTable'), filtered);
+  renderBatchListTable(document.getElementById('vendorBatchTable'), filtered, false);
 }
 
 // 관리자용: 업체(vendors) 탭에서 특정 업체를 선택해, 그 업체가 보는 제조사 포털 화면(배너+판매내역+일자별 필터)을
@@ -4660,7 +5051,7 @@ function openVendorMonitorModal(vendorId) {
   if (!vendor) return;
   const allBatches = BATCHES.filter(b => b.vendor_id === vendorId);
   document.getElementById('vendorMonitorTitle').textContent = '업체 판매 모니터링 — ' + (vendor.name || '');
-  renderVendorBannerInto(vendor, allBatches, document.getElementById('vendorMonitorBannerWrap'));
+  renderVendorBannerInto(vendor, allBatches, document.getElementById('vendorMonitorBannerWrap'), false);
 
   // 월별 매출 미니 차트 (최근 12개월)
   const byMonth = {};
