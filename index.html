@@ -152,8 +152,17 @@
     .toolbar { gap: 6px; }
     .toolbar input[type=text], .toolbar select, .toolbar input[type=date] { min-width: 0; flex: 1 1 auto; width: auto; font-size: 12.5px; padding: 7px 10px; }
     .toolbar .count { margin-left: 0; width: 100%; order: 5; }
-    table { font-size: 11.5px; }
-    thead th, tbody td { padding: 7px 8px; }
+    table { font-size: 11.5px; table-layout: fixed; }
+    thead th, tbody td { padding: 7px 6px; }
+
+    /* 모바일에서는 옆으로 밀지 않고, 셀 내용이 잘리는 대신 줄바꿈되어 보이도록 처리 */
+    .table-scroll { overflow-x: hidden; max-height: none; }
+    .table-scroll table, .table-scroll.wide table { min-width: 0; width: 100%; }
+    thead th, tbody td {
+      white-space: normal; word-break: break-word; overflow-wrap: break-word;
+      line-height: 1.32; vertical-align: top;
+    }
+    thead th { position: static; }
     #editModalOverlay > div, #rowDetailOverlay > div { padding: 16px; max-width: 100%; }
     #editModalBody { grid-template-columns: 1fr !important; }
     [style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
