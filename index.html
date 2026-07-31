@@ -1021,6 +1021,36 @@
       <div class="desc">제조사 포털 및 담당자가 제출한 데이터 수정 요청입니다. "AI 분석"을 누르면 요청 내용을 해석해 어떤 데이터를 어떻게 바꿀지 제안합니다. 제안을 확인한 뒤 승인하면 실제 데이터에 반영됩니다.</div>
       <div class="toolbar">
         <span class="count" id="editReqCount"></span>
+        <button id="erAdminToggleBtn" style="border:1px solid var(--border); background:#fff; border-radius:8px; padding:7px 12px; font-size:12px; cursor:pointer;">+ 새 요청 등록</button>
+      </div>
+      <div id="erAdminForm" style="display:none; background:#fafaf8; border:1px solid var(--border); border-radius:10px; padding:14px; margin-bottom:14px;">
+        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px; margin-bottom:10px;">
+          <div>
+            <label class="launch-label">업체 (선택)</label>
+            <select id="erAdminVendor" style="width:100%; padding:8px 10px; border:1px solid var(--border); border-radius:6px; font-size:13px; background:#fff;">
+              <option value="">미지정</option>
+            </select>
+          </div>
+          <div>
+            <label class="launch-label">수정 대상</label>
+            <select id="erAdminTargetArea" style="width:100%; padding:8px 10px; border:1px solid var(--border); border-radius:6px; font-size:13px; background:#fff;">
+              <option value="vendor">업체 정보</option>
+              <option value="sku">제품(SKU) 정보</option>
+              <option value="batch">배치(차수) 데이터</option>
+              <option value="other" selected>기타</option>
+            </select>
+          </div>
+          <div>
+            <label class="launch-label">대상 이름/식별 정보</label>
+            <input type="text" id="erAdminTargetRef" placeholder="예: 한길침장 13차" style="width:100%; padding:8px 10px; border:1px solid var(--border); border-radius:6px; font-size:13px;">
+          </div>
+        </div>
+        <label class="launch-label">요청 내용 *</label>
+        <textarea id="erAdminRequestText" rows="3" placeholder="관리자가 직접 등록하는 수정 요청 내용을 적어주세요." style="width:100%; padding:8px 10px; border:1px solid var(--border); border-radius:6px; font-size:13px; font-family:inherit; resize:vertical;"></textarea>
+        <div style="display:flex; align-items:center; gap:10px; margin-top:10px;">
+          <button id="erAdminSubmitBtn" style="border:none; background:var(--accent); color:#fff; border-radius:8px; padding:9px 16px; font-size:12.5px; font-weight:700; cursor:pointer;">등록</button>
+          <span style="font-size:11.5px; color:var(--muted);" id="erAdminStatus"></span>
+        </div>
       </div>
       <div id="editRequestList"></div>
     </div>
@@ -3539,8 +3569,60 @@ function updateEditReqBadge() {
   document.getElementById('editReqBadge').textContent = pending ? String(pending) : '';
 }
 
+function wireAdminEditRequestForm() {
+  const toggleBtn = document.getElementById('erAdminToggleBtn');
+  const form = document.getElementById('erAdminForm');
+  const vendorSel = document.getElementById('erAdminVendor');
+  if (!toggleBtn || toggleBtn.dataset.bound) return;
+  toggleBtn.addEventListener('click', () => {
+    const showing = form.style.display !== 'none';
+    form.style.display = showing ? 'none' : 'block';
+    toggleBtn.textContent = showing ? '+ 새 요청 등록' : '접기';
+  });
+  const submitBtn = document.getElementById('erAdminSubmitBtn');
+  submitBtn.addEventListener('click', async () => {
+    const vendorId = vendorSel.value || null;
+    const area = document.getElementById('erAdminTargetArea').value;
+    const ref = document.getElementById('erAdminTargetRef').value.trim();
+    const textEl = document.getElementById('erAdminRequestText');
+    const text = textEl.value.trim();
+    const statusEl = document.getElementById('erAdminStatus');
+    if (!text) { statusEl.textContent = '요청 내용을 입력해주세요.'; return; }
+    submitBtn.disabled = true;
+    statusEl.textContent = '등록 중…';
+    try {
+      await callApi('create_edit_request', { vendorId, targetArea: area, targetRef: ref, requestText: text });
+      textEl.value = '';
+      document.getElementById('erAdminTargetRef').value = '';
+      vendorSel.value = '';
+      statusEl.textContent = '등록되었습니다.';
+      await refreshEditRequests();
+      updateEditReqBadge();
+      renderEditRequestsTab();
+      form.style.display = 'none';
+      toggleBtn.textContent = '+ 새 요청 등록';
+    } catch (e) {
+      console.error('createEditRequest(admin) failed', e);
+      statusEl.textContent = '등록 중 오류가 발생했습니다: ' + (e.message || e);
+    } finally {
+      submitBtn.disabled = false;
+    }
+  });
+  toggleBtn.dataset.bound = '1';
+}
+
 function renderEditRequestsTab() {
   document.getElementById('editReqCount').textContent = EDIT_REQUESTS.length + '건 (처리 대기 ' + EDIT_REQUESTS.filter(r => r.status === 'submitted' || r.status === 'ai_proposed').length + '건)';
+  const vendorSel = document.getElementById('erAdminVendor');
+  if (vendorSel && !vendorSel.dataset.filled) {
+    VENDORS.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '')).forEach(v => {
+      const opt = document.createElement('option');
+      opt.value = v.id; opt.textContent = v.name;
+      vendorSel.appendChild(opt);
+    });
+    vendorSel.dataset.filled = '1';
+  }
+  wireAdminEditRequestForm();
   const el = document.getElementById('editRequestList');
   if (!EDIT_REQUESTS.length) { el.innerHTML = '<div class="empty">접수된 수정 요청이 없습니다</div>'; return; }
   const statusColor = { submitted: '#b45309', ai_proposed: '#2563eb', applied: '#15803d', rejected: '#b91c1c' };
