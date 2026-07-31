@@ -3770,12 +3770,19 @@ async function rejectLaunchRequest(id) {
 
 // ---------------- SKUS ----------------
 function renderSkus() {
-  // No per-SKU sales quantity is tracked (batches record vendor-level shipments,
-  // not individual SKU line items), so "판매량순" is approximated using each
-  // SKU's brand/vendor total quantity sold across all batches (qty_total sum).
-  const vendorQty = {};
-  BATCHES.forEach(b => { vendorQty[b.vendor_name] = (vendorQty[b.vendor_name] || 0) + (Number(b.qty_total) || 0); });
-  const rows = SKUS.map(s => Object.assign({}, s, { _salesQty: vendorQty[s.vendor_name] || 0 }));
+  // SKU별 실제 판매 실적은 direct_ship_monthly_sales(Shopify 자동 동기화, SKU 코드 매칭)에서 집계합니다.
+  // (과거에는 batches의 업체 단위 총 qty_total을 그대로 넣어 같은 업체의 모든 SKU가 동일한 값으로 보이는
+  //  오류가 있었습니다 — SKU별 실적이 구분되도록 수정했습니다.)
+  const skuOrders = {}, skuRevenue = {};
+  MONTHLY_SALES.forEach(m => {
+    if (!m.sku) return;
+    skuOrders[m.sku] = (skuOrders[m.sku] || 0) + (Number(m.orders_count) || 0);
+    skuRevenue[m.sku] = (skuRevenue[m.sku] || 0) + (Number(m.net_sales_usd) || 0);
+  });
+  const rows = SKUS.map(s => Object.assign({}, s, {
+    _salesOrders: skuOrders[s.direct_ship_code] || 0,
+    _salesRevenue: skuRevenue[s.direct_ship_code] || 0,
+  }));
 
   const columns = [
     { key: 'vendor_name', label: '브랜드/제조사', render: r => `<td>${esc(r.vendor_name)}</td>` },
@@ -3783,13 +3790,14 @@ function renderSkus() {
     { key: 'name_kr', label: '상품명', render: r => `<td>${esc(r.name_kr)}</td>` },
     { key: 'category', label: '카테고리', render: r => `<td>${esc(r.category)}</td>` },
     { key: 'status', label: '상태', render: r => { const cls = r.status==='OPEN'?'open':(r.status==='PENDING'?'pending':'stopstatus'); return `<td><span class="tag ${cls}">${esc(r.status)}</span></td>`; } },
-    { key: '_salesQty', label: '제조사 판매량', render: r => `<td class="num">${fmtNum(r._salesQty)}</td>` },
+    { key: '_salesOrders', label: '판매건수(누적)', render: r => `<td class="num">${fmtNum(r._salesOrders)}</td>` },
+    { key: '_salesRevenue', label: '누적매출($)', render: r => `<td class="num">${fmtUsd(r._salesRevenue)}</td>` },
     { key: 'supply_price_usd', label: '공급가($)', render: r => `<td class="num">${fmtUsd(r.supply_price_usd)}</td>` },
     { key: 'online_price_usd', label: '자사몰가($)', render: r => `<td class="num">${fmtUsd(r.online_price_usd)}</td>` },
     { key: 'online_margin_rate', label: '마진율', render: r => `<td class="num ${marginClass(r.online_margin_rate)}">${fmtPct(r.online_margin_rate)}</td>` },
   ];
   const tableEl = document.getElementById('skuTable');
-  const controller = makeTable(tableEl, columns, rows, { defaultSort: '_salesQty', defaultDir: -1, onRowClick: openSkuEditModal });
+  const controller = makeTable(tableEl, columns, rows, { defaultSort: '_salesOrders', defaultDir: -1, onRowClick: openSkuEditModal });
 
   const catSel = document.getElementById('skuCategoryFilter');
   const vendorSel = document.getElementById('skuVendorFilter');
