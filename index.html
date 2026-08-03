@@ -1170,7 +1170,7 @@ if (window.Chart) {
   Chart.register({
     id: 'forceLastTickLabel',
     afterDraw(chart) {
-      if (!chart.config._forceLastTick) return;
+      if (!(chart.options && chart.options.plugins && chart.options.plugins.forceLastTickLabel)) return;
       const xScale = chart.scales && chart.scales.x;
       const labels = chart.data && chart.data.labels;
       if (!xScale || !labels || !labels.length) return;
@@ -1273,7 +1273,11 @@ function makeChart(canvasId, config) {
   const isCategoryXAxis = config.data && Array.isArray(config.data.labels) && config.data.labels.length
     && config.type !== 'doughnut' && config.type !== 'pie'
     && (!config.options || config.options.indexAxis !== 'y');
-  if (isCategoryXAxis) config._forceLastTick = true;
+  if (isCategoryXAxis) {
+    config.options = config.options || {};
+    config.options.plugins = config.options.plugins || {};
+    config.options.plugins.forceLastTickLabel = true;
+  }
   chartInstances[canvasId] = new Chart(el, config);
   return chartInstances[canvasId];
 }
