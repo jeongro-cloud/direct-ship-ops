@@ -879,6 +879,7 @@
   <section id="panel-batches" class="panel">
     <div class="toolbar">
       <input type="text" id="batchSearch" placeholder="업체·배치명 검색" />
+      <select id="batchYearFilter"><option value="">전체 년도</option></select>
       <select id="batchMonthFilter"><option value="">전체 월</option></select>
       <span style="font-size:12px; color:var(--muted);">출고일:</span>
       <input type="date" id="batchDateFrom" title="출고일 시작(일단위 조회)" />
@@ -893,7 +894,7 @@
       <button id="batchAddBtn" style="border:none; background:var(--accent); color:#fff; border-radius:8px; padding:8px 14px; font-size:12.5px; font-weight:700; cursor:pointer;">+ 새 배치 추가</button>
     </div>
     <div class="table-scroll wide"><table id="batchTable"></table></div>
-    <div class="footnote">2026년 1~7월 차수(배치) 데이터 요약 · 출고일(ship_date) 기준 일단위 조회 가능 · 상세 전체 컬럼은 "전체 데이터" 탭 참고 · 표가 화면보다 넓으면 아래쪽 스크롤바를 좌우로 드래그해 나머지 열을 확인하세요</div>
+    <div class="footnote">차수(배치) 데이터 요약 · '월'은 실제 출고일(ship_date) 기준 월입니다 · 출고일 기준 일단위 조회도 가능 · 상세 전체 컬럼은 "전체 데이터" 탭 참고 · 표가 화면보다 넓으면 아래쪽 스크롤바를 좌우로 드래그해 나머지 열을 확인하세요</div>
   </section>
 
   <!-- FULL DATA (원본 시트 전체 컬럼) -->
@@ -927,6 +928,7 @@
       <div class="desc">수량·매출·목표·취소·클레임·마진율은 표 안 칸을 바로 클릭해 수정하면 즉시 저장됩니다(다이렉트 변경). 그 외 항목(업체·출고일 등)을 고치거나 전체 항목을 보려면 행을 클릭하세요.</div>
       <div class="toolbar">
         <input type="text" id="fullSearch" placeholder="업체·배치명 검색" />
+        <select id="fullYearFilter"><option value="">전체 년도</option></select>
         <select id="fullMonthFilter"><option value="">전체 월</option></select>
         <button id="fullXlsxDownloadBtn" style="border:1px solid var(--border); background:#fff; border-radius:8px; padding:7px 12px; font-size:12px; cursor:pointer;">⬇️ 전체 데이터 엑셀 다운로드</button>
         <button id="fullAddBtn" style="border:none; background:var(--accent); color:#fff; border-radius:8px; padding:7px 12px; font-size:12.5px; font-weight:700; cursor:pointer;">+ 새 배치 추가</button>
@@ -2245,6 +2247,7 @@ function renderCategory() {
   const live2026 = {};
   cats.forEach(c => live2026[c] = Array(12).fill(0));
   BATCHES.forEach(b => {
+    if (Number(b.year) !== 2026) return; // '월'은 이제 실제 출고월 기준이라 연도를 반드시 함께 걸러야 한다
     const cat = vendorCategory[b.vendor_name];
     if (!cat || !live2026[cat]) return;
     live2026[cat][b.month-1] += Number(b.revenue_total_usd) || 0;
@@ -2289,6 +2292,7 @@ function renderCategoryProfitAndGrowth(cats, live2026, hist2025, vendorCategory,
   const marginWeightedSum = {}, marginWeightTotal = {};
   cats.forEach(c => { marginWeightedSum[c] = 0; marginWeightTotal[c] = 0; });
   BATCHES.forEach(b => {
+    if (Number(b.year) !== 2026) return; // '월'은 이제 실제 출고월 기준이라 연도를 반드시 함께 걸러야 한다
     const cat = vendorCategory[b.vendor_name];
     if (!cat || !profit2026[cat]) return;
     const rev = Number(b.revenue_total_usd) || 0;
@@ -3460,6 +3464,7 @@ function renderVendors() {
 function renderVendorProfitAnalysis() {
   const byVendor = {};
   BATCHES.forEach(b => {
+    if (Number(b.year) !== 2026) return; // '월'은 이제 실제 출고월 기준이라 연도를 반드시 함께 걸러야 한다
     const key = b.vendor_id || b.vendor_name;
     if (!key) return;
     if (!byVendor[key]) byVendor[key] = {
@@ -3929,6 +3934,10 @@ function renderBatches() {
   ];
   const tableEl = document.getElementById('batchTable');
   const controller = makeTable(tableEl, columns, BATCHES, { defaultSort: 'month', defaultDir: -1, onRowClick: showRowDetail });
+  const yearSel = document.getElementById('batchYearFilter');
+  yearSel.innerHTML = '<option value="">전체 년도</option>';
+  const years = Array.from(new Set(BATCHES.map(b => b.year))).sort((a,b)=>a-b);
+  years.forEach(y => { const o=document.createElement('option'); o.value=y; o.textContent=y+'년'; yearSel.appendChild(o); });
   const monthSel = document.getElementById('batchMonthFilter');
   monthSel.innerHTML = '<option value="">전체 월</option>';
   const months = monthOptionsIncludingToday(BATCHES.map(b => b.month));
@@ -3937,10 +3946,12 @@ function renderBatches() {
   const dateTo = document.getElementById('batchDateTo');
   function applyFilter() {
     const q = document.getElementById('batchSearch').value.trim().toLowerCase();
+    const year = yearSel.value;
     const month = monthSel.value;
     const fromD = dateFrom.value;
     const toD = dateTo.value;
     const filtered = BATCHES.filter(b => {
+      if (year && String(b.year) !== year) return false;
       if (month && String(b.month) !== month) return false;
       if (fromD && (!b.ship_date || String(b.ship_date).slice(0,10) < fromD)) return false;
       if (toD && (!b.ship_date || String(b.ship_date).slice(0,10) > toD)) return false;
@@ -3952,6 +3963,7 @@ function renderBatches() {
     document.getElementById('batchCount').textContent = filtered.length + ' / ' + BATCHES.length + '개 배치' + dateNote;
   }
   document.getElementById('batchSearch').addEventListener('input', applyFilter);
+  yearSel.addEventListener('change', applyFilter);
   monthSel.addEventListener('change', applyFilter);
   dateFrom.addEventListener('change', applyFilter);
   dateTo.addEventListener('change', applyFilter);
@@ -4029,6 +4041,10 @@ function renderFullData() {
   const controller = makeTable(tableEl, columns, rows, { defaultSort: 'month', defaultDir: -1, onRowClick: openBatchEditFromRow });
   wireFullTableInlineEdits();
 
+  const yearSel = document.getElementById('fullYearFilter');
+  yearSel.innerHTML = '<option value="">전체 년도</option>';
+  const years = Array.from(new Set(BATCHES.map(b => b.year))).sort((a,b)=>a-b);
+  years.forEach(y => { const o=document.createElement('option'); o.value=y; o.textContent=y+'년'; yearSel.appendChild(o); });
   const monthSel = document.getElementById('fullMonthFilter');
   monthSel.innerHTML = '<option value="">전체 월</option>';
   const months = monthOptionsIncludingToday(BATCHES.map(b => b.month));
@@ -4036,8 +4052,10 @@ function renderFullData() {
 
   function applyFilter() {
     const q = document.getElementById('fullSearch').value.trim().toLowerCase();
+    const year = yearSel.value;
     const month = monthSel.value;
     const filtered = rows.filter(r => {
+      if (year && String(r.year) !== year) return false;
       if (month && String(r.month) !== month) return false;
       if (!q) return true;
       return [r.vendor_name, r.batch_label].some(f => (f||'').toLowerCase().includes(q));
@@ -4046,6 +4064,7 @@ function renderFullData() {
     document.getElementById('fullCount').textContent = filtered.length + ' / ' + rows.length + '개 배치';
   }
   document.getElementById('fullSearch').addEventListener('input', applyFilter);
+  yearSel.addEventListener('change', applyFilter);
   monthSel.addEventListener('change', applyFilter);
   applyFilter();
 
