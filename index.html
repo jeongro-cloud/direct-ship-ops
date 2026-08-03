@@ -1765,6 +1765,13 @@ function expandPeriodRange(fromKey, toKey) {
   }
   return out;
 }
+// 배치(차수)의 '월'은 실제 출고일(ship_date)이 아니라 발주/처리 차수(운영 주기) 월을 의미하는 값이라
+// 최신 배치가 아직 등록 안 된 달에도, 오늘 날짜가 속한 달만큼은 드롭다운에 미리 보이도록 채워둔다.
+function monthOptionsIncludingToday(existingMonths) {
+  const set = new Set(existingMonths);
+  set.add(new Date().getMonth() + 1);
+  return Array.from(set).sort((a, b) => a - b);
+}
 function getAllPeriodKeys() {
   const keys = new Set(BATCHES.map(periodKey));
   MONTHLY_SALES.forEach(r => keys.add(monthlySalesPeriodKey(r)));
@@ -3924,7 +3931,7 @@ function renderBatches() {
   const controller = makeTable(tableEl, columns, BATCHES, { defaultSort: 'month', defaultDir: -1, onRowClick: showRowDetail });
   const monthSel = document.getElementById('batchMonthFilter');
   monthSel.innerHTML = '<option value="">전체 월</option>';
-  const months = Array.from(new Set(BATCHES.map(b => b.month))).sort((a,b)=>a-b);
+  const months = monthOptionsIncludingToday(BATCHES.map(b => b.month));
   months.forEach(m => { const o=document.createElement('option'); o.value=m; o.textContent=m+'월'; monthSel.appendChild(o); });
   const dateFrom = document.getElementById('batchDateFrom');
   const dateTo = document.getElementById('batchDateTo');
@@ -4023,7 +4030,8 @@ function renderFullData() {
   wireFullTableInlineEdits();
 
   const monthSel = document.getElementById('fullMonthFilter');
-  const months = Array.from(new Set(BATCHES.map(b => b.month))).sort((a,b)=>a-b);
+  monthSel.innerHTML = '<option value="">전체 월</option>';
+  const months = monthOptionsIncludingToday(BATCHES.map(b => b.month));
   months.forEach(m => { const o=document.createElement('option'); o.value=m; o.textContent=m+'월'; monthSel.appendChild(o); });
 
   function applyFilter() {
