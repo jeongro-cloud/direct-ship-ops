@@ -1163,36 +1163,6 @@ if (window.Chart) {
   Chart.defaults.plugins.legend.labels.boxWidth = 8;
   Chart.defaults.plugins.legend.labels.boxHeight = 8;
   Chart.defaults.plugins.legend.labels.padding = 14;
-
-  // 월별 라벨이 많아지면 Chart.js의 autoSkip이 x축 라벨 일부를 건너뛰는데, 이 과정에서
-  // 가장 마지막(=오늘이 속한 최신 달) 라벨이 스킵되어 "그래프가 갱신 안 된 것"처럼 보일 수 있다.
-  // autoSkip 내부 로직을 직접 건드리는 대신, 항상 마지막 라벨만큼은 캔버스에 직접 그려서 보장한다.
-  Chart.register({
-    id: 'forceLastTickLabel',
-    afterDraw(chart) {
-      if (!(chart.options && chart.options.plugins && chart.options.plugins.forceLastTickLabel)) return;
-      const xScale = chart.scales && chart.scales.x;
-      const labels = chart.data && chart.data.labels;
-      if (!xScale || !labels || !labels.length) return;
-      const lastIdx = labels.length - 1;
-      if (xScale.ticks.some(t => t.value === lastIdx)) return; // 이미 표시되고 있으면 아무것도 안 함
-      const label = labels[lastIdx];
-      if (label === undefined || label === null || label === '') return;
-      const x = xScale.getPixelForTick(lastIdx);
-      const y = xScale.bottom;
-      const rotationDeg = xScale._labelRotation || 0;
-      const ctx = chart.ctx;
-      ctx.save();
-      ctx.font = `${Chart.defaults.font.size}px ${Chart.defaults.font.family}`;
-      ctx.fillStyle = Chart.defaults.color;
-      ctx.translate(x, y + 8);
-      ctx.rotate(-rotationDeg * Math.PI / 180);
-      ctx.textAlign = rotationDeg ? 'right' : 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(String(label), 0, 0);
-      ctx.restore();
-    }
-  });
 }
 
 // ---- 공개 웹사이트용 보안 백엔드 API 클라이언트 (Supabase Edge Function: app-api) ----
@@ -1267,16 +1237,27 @@ function makeChart(canvasId, config) {
   const el = document.getElementById(canvasId);
   if (!el) return null;
   if (chartInstances[canvasId]) { chartInstances[canvasId].destroy(); }
-  // 월별 라벨이 많아지면 Chart.js의 autoSkip이 마지막(=오늘이 속한 최신 달) 라벨을 건너뛸 수 있어
-  // 마치 그래프가 갱신 안 된 것처럼 보인다 — forceLastTickLabel 플러그인이 항상 그 라벨을 그려주도록 표시한다.
+  // 월별 라벨이 많아지면 Chart.js의 기본 autoSkip이 짝수 간격으로만 라벨을 남기는데, 라벨 개수가
+  // 짝수(예: 32개)이면 마지막(=오늘이 속한 최신 달) 라벨이 그 간격에서 항상 제외되어 마치
+  // 그래프가 갱신 안 된 것처럼 보인다. autoSkip을 끄고 직접 간격을 계산해 마지막 라벨은 항상 남긴다.
   // (가로 막대(indexAxis:'y')·도넛/파이 차트는 x축이 카테고리 라벨이 아니므로 제외)
   const isCategoryXAxis = config.data && Array.isArray(config.data.labels) && config.data.labels.length
     && config.type !== 'doughnut' && config.type !== 'pie'
     && (!config.options || config.options.indexAxis !== 'y');
   if (isCategoryXAxis) {
     config.options = config.options || {};
-    config.options.plugins = config.options.plugins || {};
-    config.options.plugins.forceLastTickLabel = true;
+    config.options.scales = config.options.scales || {};
+    config.options.scales.x = config.options.scales.x || {};
+    const xScale = config.options.scales.x;
+    xScale.ticks = xScale.ticks || {};
+    const total = config.data.labels.length;
+    const desiredCount = 16;
+    const step = Math.max(1, Math.ceil(total / desiredCount));
+    xScale.ticks.autoSkip = false;
+    xScale.ticks.callback = function(value, index) {
+      if (index === total - 1 || index % step === 0) return this.getLabelForValue(value);
+      return null;
+    };
   }
   chartInstances[canvasId] = new Chart(el, config);
   return chartInstances[canvasId];
