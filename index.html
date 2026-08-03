@@ -1240,7 +1240,14 @@ function makeChart(canvasId, config) {
   // 월별 라벨이 많아지면 Chart.js가 자동으로 일부 라벨을 건너뛰는데(autoSkip),
   // 이때 가장 마지막(=오늘이 속한 최신 달) 라벨이 스킵되어 마치 그래프가 갱신 안 된 것처럼 보일 수 있다.
   // 데이터가 0(아직 실적 없음)이라도 최신 달 라벨만큼은 항상 표시되도록 강제한다.
-  if (config.options && config.options.scales && config.options.scales.x && config.data && Array.isArray(config.data.labels)) {
+  // (가로 막대(indexAxis:'y')·도넛/파이 차트는 x축이 카테고리 라벨이 아니므로 제외)
+  const isCategoryXAxis = config.data && Array.isArray(config.data.labels) && config.data.labels.length
+    && config.type !== 'doughnut' && config.type !== 'pie'
+    && (!config.options || config.options.indexAxis !== 'y');
+  if (isCategoryXAxis) {
+    config.options = config.options || {};
+    config.options.scales = config.options.scales || {};
+    config.options.scales.x = config.options.scales.x || {};
     const xScale = config.options.scales.x;
     const prevAfterBuildTicks = xScale.afterBuildTicks;
     xScale.afterBuildTicks = (axis) => {
