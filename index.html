@@ -1724,10 +1724,32 @@ const ACCOUNT_EDIT_FIELDS = [
 // 배치(차수) 데이터는 2026년부터만 존재하므로, 조회기간 자체가 26년으로 국한되지 않도록
 // direct_ship_monthly_sales(2024~2026 Shopify 월별 매출)의 연/월도 함께 합쳐서 드롭다운을 구성한다.
 function monthlySalesPeriodKey(r) { return `${r.sale_year}-${String(r.sale_month).padStart(2, '0')}`; }
+// 오늘(브라우저 기준 실제 날짜)의 "YYYY-MM" 키. 매출/배치 데이터가 아직 없어도 새 달이 시작되면
+// 조회기간·그래프가 자동으로 그 달까지 확장되도록 하는 기준점이다.
+function todayPeriodKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+// 연속된 월 목록을 만든다 (from~to 사이에 데이터가 없는 달도 빠짐없이 포함).
+function expandPeriodRange(fromKey, toKey) {
+  if (!fromKey || !toKey) return [];
+  const [fy, fm] = fromKey.split('-').map(Number);
+  const [ty, tm] = toKey.split('-').map(Number);
+  const out = [];
+  let y = fy, m = fm;
+  while (y < ty || (y === ty && m <= tm)) {
+    out.push(`${y}-${String(m).padStart(2, '0')}`);
+    m += 1; if (m > 12) { m = 1; y += 1; }
+  }
+  return out;
+}
 function getAllPeriodKeys() {
   const keys = new Set(BATCHES.map(periodKey));
   MONTHLY_SALES.forEach(r => keys.add(monthlySalesPeriodKey(r)));
-  return Array.from(keys).sort();
+  keys.add(todayPeriodKey()); // 매출이 아직 없어도 이번 달은 항상 포함
+  const sorted = Array.from(keys).sort();
+  // 최초~마지막 사이의 빈 달도 채워서 그래프/드롭다운에 자연스럽게 이어지도록 한다.
+  return sorted.length ? expandPeriodRange(sorted[0], sorted[sorted.length - 1]) : sorted;
 }
 // 해당 기간(key)의 매출: 배치(차수) 데이터가 있으면 배치 기준, 없으면 Shopify 월별 매출로 대체.
 // 마진율/취소·클레임/채널믹스처럼 배치에만 존재하는 값은 이 함수로 대체할 수 없다 — 그 항목들은 배치 데이터 있는 기간에서만 표시된다.
@@ -1889,8 +1911,8 @@ function renderOverview() {
 
   renderMomChart();
   renderYoyChart();
-  renderCancelClaimChart(filtered);
-  renderChannelMixChart(filtered);
+  renderCancelClaimChart(filtered, periodRange);
+  renderChannelMixChart(filtered, periodRange);
   renderOverviewInsights(filtered, keys);
 }
 
@@ -1956,7 +1978,7 @@ function renderYoyChart() {
   document.getElementById('yoyDataNote').textContent = noteParts.join(' ');
 }
 
-function renderCancelClaimChart(filtered) {
+function renderCancelClaimChart(filtered, periodRange) {
   const byMonth = {};
   filtered.forEach(b => {
     const k = periodKey(b);
@@ -1964,17 +1986,18 @@ function renderCancelClaimChart(filtered) {
     byMonth[k].cancel += Number(b.cancel_count) || 0;
     byMonth[k].claim += Number(b.claim_count) || 0;
   });
-  const keys = Object.keys(byMonth).sort();
+  // 배치가 아직 등록되지 않은 달(오늘 포함)도 0건으로 표시되도록 선택 기간의 모든 달을 그대로 사용한다.
+  const keys = (periodRange && periodRange.length) ? periodRange : Object.keys(byMonth).sort();
   makeChart('cancelClaimChart', {
     data: { labels: keys.map(labelForKey), datasets: [
-      { type: 'bar', label: '취소건', data: keys.map(k => byMonth[k].cancel), backgroundColor: '#dc2626aa' },
-      { type: 'bar', label: '클레임건', data: keys.map(k => byMonth[k].claim), backgroundColor: '#7c3aedaa' }
+      { type: 'bar', label: '취소건', data: keys.map(k => (byMonth[k] ? byMonth[k].cancel : 0)), backgroundColor: '#dc2626aa' },
+      { type: 'bar', label: '클레임건', data: keys.map(k => (byMonth[k] ? byMonth[k].claim : 0)), backgroundColor: '#7c3aedaa' }
     ]},
     options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
   });
 }
 
-function renderChannelMixChart(filtered) {
+function renderChannelMixChart(filtered, periodRange) {
   const byMonth = {};
   filtered.forEach(b => {
     const k = periodKey(b);
@@ -1982,12 +2005,12 @@ function renderChannelMixChart(filtered) {
     byMonth[k].online += Number(b.qty_online) || 0;
     byMonth[k].store += Number(b.qty_store) || 0;
   });
-  const keys = Object.keys(byMonth).sort();
+  const keys = (periodRange && periodRange.length) ? periodRange : Object.keys(byMonth).sort();
   makeChart('channelMixChart', {
     type: 'bar',
     data: { labels: keys.map(labelForKey), datasets: [
-      { label: '온라인 판매수량', data: keys.map(k => byMonth[k].online), backgroundColor: '#2563eb' },
-      { label: '직매장 판매수량', data: keys.map(k => byMonth[k].store), backgroundColor: '#15803d' }
+      { label: '온라인 판매수량', data: keys.map(k => (byMonth[k] ? byMonth[k].online : 0)), backgroundColor: '#2563eb' },
+      { label: '직매장 판매수량', data: keys.map(k => (byMonth[k] ? byMonth[k].store : 0)), backgroundColor: '#15803d' }
     ]},
     options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } } }
   });
