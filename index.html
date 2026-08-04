@@ -126,6 +126,9 @@
   .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); max-height: 640px; overflow-y: auto; box-shadow: var(--shadow-sm); scrollbar-width: auto; scrollbar-color: #c9c2b4 #f3f2ef; }
   .table-scroll table { min-width: 760px; }
   .table-scroll.wide table { min-width: 1700px; }
+  /* 엑셀 원본처럼, 수식으로 자동계산되는 칸은 옅은 색으로 구분해 "직접 입력"과 시각적으로 구별한다 */
+  .formula-col { background: #fff8ec; }
+  .table-scroll table thead th.formula-col-h { background: #fdf1e4; }
   .table-scroll::-webkit-scrollbar { height: 12px; width: 12px; }
   .table-scroll::-webkit-scrollbar-track { background: #f3f2ef; }
   .table-scroll::-webkit-scrollbar-thumb { background: #c9c2b4; border-radius: 6px; border: 2px solid #f3f2ef; }
@@ -935,8 +938,8 @@
       <span id="skuXlsxStatus" style="font-size:11px; color:var(--muted);"></span>
       <button id="skuAddBtn" style="border:none; background:var(--accent); color:#fff; border-radius:8px; padding:8px 14px; font-size:12.5px; font-weight:700; cursor:pointer;">+ 새 SKU 추가</button>
     </div>
-    <div class="table-scroll"><table id="skuTable"></table></div>
-    <div class="footnote">1. 브랜드별 상품 구성 시트 기준 임포트 (217개 SKU) · 공급가/마진율은 자사몰 기준 · 기본 정렬: 브랜드(제조사) 판매량 많은 순 (개별 SKU 단위 판매수량은 별도 집계되지 않아 제조사 합계 기준입니다)</div>
+    <div class="table-scroll wide"><table id="skuTable"></table></div>
+    <div class="footnote">1. 브랜드별 상품 구성 시트 기준 임포트 (217개 SKU) · 공급가/마진율은 자사몰 기준 · 기본 정렬: 브랜드(제조사) 판매량 많은 순 (개별 SKU 단위 판매수량은 별도 집계되지 않아 제조사 합계 기준입니다) · 배경이 옅은 주황색인 칸(관세·총공급가·마진율)은 원본 엑셀 수식 그대로 앱에서 실시간 자동계산한 값입니다</div>
   </section>
 
   <!-- BATCHES (요약) -->
@@ -1348,7 +1351,7 @@ function makeTable(tableEl, columns, rows, opts) {
       });
     }
     const thead = '<thead><tr>' + columns.map(c =>
-      `<th data-key="${c.key}" class="${c.key===sortKey?'sorted':''}">${c.label}${c.key===sortKey ? (sortDir===1?' ▲':' ▼') : ''}</th>`
+      `<th data-key="${c.key}" class="${c.key===sortKey?'sorted':''} ${c.headerClass||''}">${c.label}${c.key===sortKey ? (sortDir===1?' ▲':' ▼') : ''}</th>`
     ).join('') + '</tr></thead>';
     const tbody = '<tbody>' + (data.length ? data.map(r => '<tr>' + columns.map(c => c.render(r)).join('') + '</tr>').join('') :
       `<tr><td colspan="${columns.length}" class="empty">결과가 없습니다</td></tr>`) + '</tbody>';
@@ -1463,7 +1466,7 @@ function coerceEditValues(fields, values) {
   const out = {};
   fields.forEach(f => {
     let v = values[f.key];
-    if (f.type === 'number' && v !== null && v !== undefined && v !== '') v = Number(v);
+    if ((f.type === 'number' || f.type === 'computed') && v !== null && v !== undefined && v !== '') v = Number(v);
     out[f.key] = v;
   });
   return out;
@@ -1497,6 +1500,11 @@ function renderEditModalBody(fields, row) {
     } else if (f.type === 'checkbox') {
       const checked = raw === true || raw === 't' || raw === 'true';
       inputHtml = `<input type="checkbox" id="ef_${f.key}" ${checked ? 'checked' : ''} style="width:16px; height:16px;">`;
+    } else if (f.type === 'computed') {
+      // 다른 입력값에서 수식으로 자동 계산되는 필드 — 직접 수정하지 못하게 잠가두고, 값이 바뀌면
+      // wireSkuCostAutoCalc() 등에서 .value를 갱신한다. disabled 상태여도 JS로는 계속 읽고 쓸 수 있다.
+      const val = raw === null || raw === undefined ? '' : raw;
+      inputHtml = `<input type="text" id="ef_${f.key}" value="${esc(val)}" disabled style="width:100%; padding:7px 8px; border:1px solid var(--border); border-radius:6px; font-size:13px; background:#f4f2ee; color:var(--muted); cursor:not-allowed;">`;
     } else {
       const inputType = f.type === 'number' ? 'number' : (f.type === 'date' ? 'date' : 'text');
       const val = raw === null || raw === undefined ? '' : (inputType === 'date' ? String(raw).slice(0,10) : raw);
@@ -1524,8 +1532,35 @@ function openEditModal(config) {
   document.getElementById('editModalTitle').textContent = config.title;
   document.getElementById('editModalError').textContent = '';
   renderEditModalBody(config.fields, config.row);
+  if (config.table === 'skus') wireSkuCostAutoCalc();
   document.getElementById('editModalDelete').style.display = config.row ? 'inline-block' : 'none';
   document.getElementById('editModalOverlay').style.display = 'flex';
+}
+
+// SKU 등록/수정 모달 전용 — 공급가/신고가액/DHL운임/판매가를 입력하는 즉시 관세·총공급원가·마진율을
+// computeSkuDerived() 수식으로 다시 계산해 자동계산 칸(disabled input)에 채워넣는다.
+function wireSkuCostAutoCalc() {
+  const inputIds = ['supply_price_usd', 'declared_value_usd', 'dhl_freight_usd', 'online_price_usd', 'store_price_usd'];
+  function recalc() {
+    const v = {};
+    inputIds.forEach(k => { const el = document.getElementById('ef_' + k); v[k] = el ? el.value : null; });
+    const d = computeSkuDerived(v);
+    const setVal = (key, num, isRate) => {
+      const el = document.getElementById('ef_' + key);
+      if (!el) return;
+      if (num === null || num === undefined || isNaN(num)) { el.value = ''; return; }
+      el.value = isRate ? Math.round(num * 10000) / 10000 : Math.round(num * 100) / 100;
+    };
+    setVal('customs_usd', d.customsUsd, false);
+    setVal('total_supply_cost_usd', d.totalSupplyCostUsd, false);
+    setVal('online_margin_rate', d.onlineMarginRate, true);
+    setVal('store_margin_rate', d.storeMarginRate, true);
+  }
+  inputIds.forEach(k => {
+    const el = document.getElementById('ef_' + k);
+    if (el) el.addEventListener('input', recalc);
+  });
+  recalc(); // 모달을 여는 즉시 기존 값 기준으로 한 번 계산해 채워둔다
 }
 
 function closeEditModal() {
@@ -1607,29 +1642,55 @@ const VENDOR_FIELDS = [
   { key: 'notes', label: '메모', type: 'textarea', wide: true },
 ];
 
+// SKU 원가/마진 공식 (담당자가 확인해준 원본 엑셀 수식 그대로 적용):
+//   관세($) = 신고가액($) × 15%  (신고가액이 비어있으면 공급가와 동일하다고 가정)
+//   총공급원가($) = 공급가($) + DHL운임($) + 관세($) + $12.05 (카드수수료 등 고정 부대비용)
+//   마진율 = (판매가 − 총공급원가) / 판매가
+// DHL운임 자체는 박스 실중량/요율단계 기준 DHL 요율표(VLOOKUP)에서 나오는 값인데, 그 요율표 데이터가
+// 앱에는 없어 자동조회는 지원하지 않고 계속 직접 입력해야 한다.
+const SKU_FIXED_SURCHARGE_USD = 12.05;
+function computeSkuDerived(v) {
+  const supply = Number(v.supply_price_usd) || 0;
+  const declaredRaw = v.declared_value_usd;
+  const declared = (declaredRaw !== null && declaredRaw !== undefined && declaredRaw !== '') ? Number(declaredRaw) : supply;
+  const dhl = Number(v.dhl_freight_usd) || 0;
+  const customsUsd = declared * 0.15;
+  const totalSupplyCostUsd = supply + dhl + customsUsd + SKU_FIXED_SURCHARGE_USD;
+  const onlinePrice = Number(v.online_price_usd) || 0;
+  const storePrice = Number(v.store_price_usd) || 0;
+  const onlineMarginRate = onlinePrice ? (onlinePrice - totalSupplyCostUsd) / onlinePrice : null;
+  const storeMarginRate = storePrice ? (storePrice - totalSupplyCostUsd) / storePrice : null;
+  return { customsUsd, totalSupplyCostUsd, onlineMarginRate, storeMarginRate };
+}
+
 function skuFields() {
   return [
-    { key: 'vendor_id', label: '제조사(업체)', type: 'select', required: true, options: () => VENDORS.map(v => ({ value: v.id, label: v.name })) },
+    { key: 'vendor_id', label: '제조사(업체)', type: 'select', required: true, section: '① 기본 정보', options: () => VENDORS.map(v => ({ value: v.id, label: v.name })) },
     { key: 'name_kr', label: '상품명(국문)', type: 'text', required: true },
     { key: 'name_en', label: '상품명(영문)', type: 'text' },
+    { key: 'composition', label: '구성', type: 'text', hint: '예: 보쌈김치 2kg + 백김치 2kg' },
+    { key: 'option_desc', label: '상세 옵션', type: 'text' },
     { key: 'variant_sku', label: '옵션 SKU', type: 'text' },
     { key: 'direct_ship_code', label: '다이렉트십 코드', type: 'text' },
     { key: 'dhl_code', label: 'DHL 코드', type: 'text' },
     { key: 'category', label: '카테고리', type: 'text' },
     { key: 'status', label: '상태', type: 'select', options: ['OPEN','PENDING','STOP'] },
-    { key: 'option_desc', label: '옵션 설명', type: 'textarea', wide: true },
-    { key: 'supply_price_krw', label: '공급가(₩)', type: 'number' },
+    { key: 'box_size_mm', label: '박스 사이즈(mm)', type: 'text', section: '② 물류/박스 규격', hint: '예: 200*200*200' },
+    { key: 'volumetric_weight_kg', label: '부피무게(kg)', type: 'number', step: '0.01' },
+    { key: 'box_actual_weight_kg', label: '박스 실중량(kg)', type: 'number', step: '0.01' },
+    { key: 'rate_tier', label: '요율 단계', type: 'number', hint: 'DHL 요율표에서 이 박스가 해당하는 구간 번호' },
+    { key: 'supply_price_krw', label: '공급가(₩)', type: 'number', section: '③ 원가 (자동계산 포함)' },
     { key: 'supply_price_usd', label: '공급가($)', type: 'number' },
-    { key: 'declared_value_usd', label: '신고가액($)', type: 'number' },
-    { key: 'dhl_freight_usd', label: 'DHL운임($)', type: 'number' },
-    { key: 'customs_usd', label: '관세($)', type: 'number' },
-    { key: 'total_supply_cost_usd', label: '총공급원가($)', type: 'number' },
-    { key: 'us_compare_price_usd', label: '미국 비교가($)', type: 'number' },
+    { key: 'declared_value_usd', label: '신고가액($)', type: 'number', hint: '비워두면 공급가($)와 동일하게 계산합니다' },
+    { key: 'dhl_freight_usd', label: 'DHL운임($)', type: 'number', hint: 'DHL 요율표 기준 직접 입력 (자동조회 미지원)' },
+    { key: 'customs_usd', label: '관세($) — 자동계산', type: 'computed', hint: '= 신고가액 × 15%' },
+    { key: 'total_supply_cost_usd', label: '총공급원가($) — 자동계산', type: 'computed', hint: '= 공급가 + DHL운임 + 관세 + $12.05(고정 부대비용)' },
+    { key: 'us_compare_price_usd', label: '미국 비교가($)', type: 'number', section: '④ 판매가 / 마진 (자동계산 포함)' },
     { key: 'online_price_usd', label: '자사몰가($)', type: 'number' },
     { key: 'store_price_usd', label: '매장가($)', type: 'number' },
-    { key: 'online_margin_rate', label: '온라인 마진율(0~1)', type: 'number', step: '0.01' },
-    { key: 'store_margin_rate', label: '매장 마진율(0~1)', type: 'number', step: '0.01' },
-    { key: 'notes', label: '메모', type: 'textarea', wide: true },
+    { key: 'online_margin_rate', label: '온라인 마진율 — 자동계산', type: 'computed', hint: '= (자사몰가 − 총공급원가) / 자사몰가' },
+    { key: 'store_margin_rate', label: '매장 마진율 — 자동계산', type: 'computed', hint: '= (매장가 − 총공급원가) / 매장가' },
+    { key: 'notes', label: '메모', type: 'textarea', wide: true, section: '⑤ 메모' },
   ];
 }
 
@@ -3941,22 +4002,49 @@ function renderSkus() {
     skuOrders[m.sku] = (skuOrders[m.sku] || 0) + (Number(m.orders_count) || 0);
     skuRevenue[m.sku] = (skuRevenue[m.sku] || 0) + (Number(m.net_sales_usd) || 0);
   });
-  const rows = SKUS.map(s => Object.assign({}, s, {
-    _salesOrders: skuOrders[s.direct_ship_code] || 0,
-    _salesRevenue: skuRevenue[s.direct_ship_code] || 0,
-  }));
+  const rows = SKUS.map(s => {
+    // 관세/총공급원가/마진율은 DB에 저장된 값이 아니라, 매번 이 화면을 그릴 때 공급가·신고가액·DHL운임·판매가로부터
+    // 원본 엑셀 수식(computeSkuDerived)으로 즉석에서 다시 계산한다 — 그래야 누가 공급가나 DHL운임만 고치고
+    // 관세/총공급가/마진율을 깜빡해도 표에는 항상 정확한 값이 보인다.
+    const derived = computeSkuDerived(s);
+    return Object.assign({}, s, {
+      _salesOrders: skuOrders[s.direct_ship_code] || 0,
+      _salesRevenue: skuRevenue[s.direct_ship_code] || 0,
+      _customsUsd: derived.customsUsd,
+      _totalSupplyCostUsd: derived.totalSupplyCostUsd,
+      _onlineMarginRate: derived.onlineMarginRate,
+      _storeMarginRate: derived.storeMarginRate,
+    });
+  });
 
+  // 엑셀 원본 시트와 같은 순서/구성의 전체 컬럼 — 담당자가 원본 캡처 화면과 나란히 대조하기 쉽도록 배치했다.
+  // 주황빛 배경(formula-col)이 붙은 칸은 직접 입력이 아니라 수식으로 자동계산되는 값이다.
   const columns = [
-    { key: 'vendor_name', label: '브랜드/제조사', render: r => `<td>${esc(r.vendor_name)}</td>` },
-    { key: 'direct_ship_code', label: 'SKU 코드', render: r => `<td>${esc(r.direct_ship_code)}</td>` },
-    { key: 'name_kr', label: '상품명', render: r => `<td>${esc(r.name_kr)}</td>` },
+    { key: 'vendor_name', label: '업체명', render: r => `<td>${esc(r.vendor_name)}</td>` },
+    { key: 'name_kr', label: '상품명(KR)', render: r => `<td>${esc(r.name_kr)}</td>` },
+    { key: 'composition', label: '구성', render: r => `<td>${esc(r.composition || '-')}</td>` },
+    { key: 'option_desc', label: '상세 옵션', render: r => `<td>${esc(r.option_desc || '-')}</td>` },
+    { key: 'name_en', label: '상품명(EN)', render: r => `<td>${esc(r.name_en || '-')}</td>` },
+    { key: 'direct_ship_code', label: 'SKU', render: r => `<td>${esc(r.direct_ship_code)}</td>` },
+    { key: 'supply_price_krw', label: '공급가(KRW)', render: r => `<td class="num">${r.supply_price_krw!=null?fmtKrw(r.supply_price_krw):'-'}</td>` },
+    { key: 'supply_price_usd', label: '공급가(USD)', render: r => `<td class="num">${fmtUsd(r.supply_price_usd)}</td>` },
+    { key: 'declared_value_usd', label: '신고액', render: r => `<td class="num">${r.declared_value_usd!=null?fmtUsd(r.declared_value_usd):fmtUsd(r.supply_price_usd)}</td>` },
+    { key: 'dhl_freight_usd', label: 'DHL 운임', render: r => `<td class="num">${fmtUsd(r.dhl_freight_usd)}</td>` },
+    { key: '_customsUsd', label: '관세', headerClass: 'formula-col-h', render: r => `<td class="num formula-col">${fmtUsd(r._customsUsd)}</td>` },
+    { key: '_totalSupplyCostUsd', label: '총 공급가', headerClass: 'formula-col-h', render: r => `<td class="num formula-col">${fmtUsd(r._totalSupplyCostUsd)}</td>` },
+    { key: 'us_compare_price_usd', label: '미국 비교가', render: r => `<td class="num">${r.us_compare_price_usd!=null?fmtUsd(r.us_compare_price_usd):'-'}</td>` },
+    { key: 'online_price_usd', label: '자사몰 판매가', render: r => `<td class="num">${fmtUsd(r.online_price_usd)}</td>` },
+    { key: 'store_price_usd', label: '직매장 판매가', render: r => `<td class="num">${r.store_price_usd!=null?fmtUsd(r.store_price_usd):'-'}</td>` },
+    { key: '_onlineMarginRate', label: '자사몰 마진율', headerClass: 'formula-col-h', render: r => `<td class="num formula-col ${marginClass(r._onlineMarginRate)}">${fmtPct(r._onlineMarginRate)}</td>` },
+    { key: '_storeMarginRate', label: '직매장 마진율', headerClass: 'formula-col-h', render: r => `<td class="num formula-col ${marginClass(r._storeMarginRate)}">${r.store_price_usd!=null?fmtPct(r._storeMarginRate):'-'}</td>` },
+    { key: 'box_size_mm', label: '박스 사이즈(mm)', render: r => `<td>${esc(r.box_size_mm || '-')}</td>` },
+    { key: 'volumetric_weight_kg', label: '부피무게(kg)', render: r => `<td class="num">${r.volumetric_weight_kg!=null?r.volumetric_weight_kg:'-'}</td>` },
+    { key: 'box_actual_weight_kg', label: '박스 실중량(kg)', render: r => `<td class="num">${r.box_actual_weight_kg!=null?r.box_actual_weight_kg:'-'}</td>` },
+    { key: 'rate_tier', label: '요율 단계', render: r => `<td class="num">${r.rate_tier!=null?r.rate_tier:'-'}</td>` },
     { key: 'category', label: '카테고리', render: r => `<td>${esc(r.category)}</td>` },
     { key: 'status', label: '상태', render: r => { const cls = r.status==='OPEN'?'open':(r.status==='PENDING'?'pending':'stopstatus'); return `<td><span class="tag ${cls}">${esc(r.status)}</span></td>`; } },
     { key: '_salesOrders', label: '판매건수(누적)', render: r => `<td class="num">${fmtNum(r._salesOrders)}</td>` },
     { key: '_salesRevenue', label: '누적매출($)', render: r => `<td class="num">${fmtUsd(r._salesRevenue)}</td>` },
-    { key: 'supply_price_usd', label: '공급가($)', render: r => `<td class="num">${fmtUsd(r.supply_price_usd)}</td>` },
-    { key: 'online_price_usd', label: '자사몰가($)', render: r => `<td class="num">${fmtUsd(r.online_price_usd)}</td>` },
-    { key: 'online_margin_rate', label: '마진율', render: r => `<td class="num ${marginClass(r.online_margin_rate)}">${fmtPct(r.online_margin_rate)}</td>` },
   ];
   const tableEl = document.getElementById('skuTable');
   const controller = makeTable(tableEl, columns, rows, { defaultSort: '_salesOrders', defaultDir: -1, onRowClick: openSkuEditModal });
