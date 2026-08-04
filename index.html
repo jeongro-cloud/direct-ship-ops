@@ -1533,6 +1533,7 @@ function openEditModal(config) {
   document.getElementById('editModalError').textContent = '';
   renderEditModalBody(config.fields, config.row);
   if (config.table === 'skus') wireSkuCostAutoCalc();
+  if (config.table === 'batches') wireBatchCostAutoCalc();
   document.getElementById('editModalDelete').style.display = config.row ? 'inline-block' : 'none';
   document.getElementById('editModalOverlay').style.display = 'flex';
 }
@@ -1561,6 +1562,66 @@ function wireSkuCostAutoCalc() {
     if (el) el.addEventListener('input', recalc);
   });
   recalc(); // 모달을 여는 즉시 기존 값 기준으로 한 번 계산해 채워둔다
+}
+
+// 배치(전체데이터/상품 캘린더) 등록·수정 모달 전용 — 원가/물류 입력값과 판매 실적 입력값으로부터
+// 총원가/총매출/마진율을 실제 DB 데이터로 검증된 수식 그대로 즉석에서 계산해 자동계산 칸에 채운다.
+//   총원가(₩) = 공급가총합 + DHL총운임 + 카드수수료 + 관세및수수료
+//   총원가($) = 총원가(₩) / 환율
+//   총판매수량 = 온라인 판매수량 + 직매장 판매수량
+//   총매출($) = 온라인 매출($) + 직매장 매출($)
+//   총매출(₩) = 총매출($) × 환율
+//   마진율 = (총매출($) − 총원가($)) / 총매출($)
+function computeBatchDerived(v) {
+  const num = (x) => { const n = Number(x); return (x === null || x === undefined || x === '' || isNaN(n)) ? null : n; };
+  const exchangeRate = num(v.exchange_rate);
+  const supply = num(v.supply_total_krw) || 0;
+  const dhl = num(v.dhl_freight_krw) || 0;
+  const cardFee = num(v.card_fee_krw) || 0;
+  const customsFee = num(v.customs_fee_krw) || 0;
+  const hasAnyCost = num(v.supply_total_krw) !== null || num(v.dhl_freight_krw) !== null || num(v.card_fee_krw) !== null || num(v.customs_fee_krw) !== null;
+  const costTotalKrw = hasAnyCost ? (supply + dhl + cardFee + customsFee) : null;
+  const costTotalUsd = (costTotalKrw !== null && exchangeRate) ? costTotalKrw / exchangeRate : null;
+
+  const qtyOnline = num(v.qty_online);
+  const qtyStore = num(v.qty_store);
+  const qtyTotal = (qtyOnline !== null || qtyStore !== null) ? (qtyOnline || 0) + (qtyStore || 0) : null;
+
+  const revOnline = num(v.revenue_online_usd);
+  const revStore = num(v.revenue_store_usd);
+  const revenueTotalUsd = (revOnline !== null || revStore !== null) ? (revOnline || 0) + (revStore || 0) : null;
+  const revenueTotalKrw = (revenueTotalUsd !== null && exchangeRate) ? revenueTotalUsd * exchangeRate : null;
+
+  const marginRate = (revenueTotalUsd && costTotalUsd !== null) ? (revenueTotalUsd - costTotalUsd) / revenueTotalUsd : null;
+
+  return { costTotalKrw, costTotalUsd, qtyTotal, revenueTotalUsd, revenueTotalKrw, marginRate };
+}
+
+function wireBatchCostAutoCalc() {
+  const inputIds = ['exchange_rate', 'supply_total_krw', 'dhl_freight_krw', 'card_fee_krw', 'customs_fee_krw', 'qty_online', 'qty_store', 'revenue_online_usd', 'revenue_store_usd'];
+  function recalc() {
+    const v = {};
+    inputIds.forEach(k => { const el = document.getElementById('ef_' + k); v[k] = el ? el.value : null; });
+    const d = computeBatchDerived(v);
+    const setVal = (key, num, decimals) => {
+      const el = document.getElementById('ef_' + key);
+      if (!el) return;
+      if (num === null || num === undefined || isNaN(num)) { el.value = ''; return; }
+      const mult = Math.pow(10, decimals);
+      el.value = Math.round(num * mult) / mult;
+    };
+    setVal('cost_total_krw', d.costTotalKrw, 0);
+    setVal('cost_total_usd', d.costTotalUsd, 2);
+    setVal('qty_total', d.qtyTotal, 0);
+    setVal('revenue_total_usd', d.revenueTotalUsd, 2);
+    setVal('revenue_total_krw', d.revenueTotalKrw, 0);
+    setVal('margin_rate', d.marginRate, 4);
+  }
+  inputIds.forEach(k => {
+    const el = document.getElementById('ef_' + k);
+    if (el) el.addEventListener('input', recalc);
+  });
+  recalc();
 }
 
 function closeEditModal() {
@@ -1716,17 +1777,17 @@ function batchFields() {
     { key: 'dhl_freight_krw', label: 'DHL총운임(₩)', type: 'number' },
     { key: 'card_fee_krw', label: '카드수수료(₩)', type: 'number' },
     { key: 'customs_fee_krw', label: '관세 및 수수료(₩)', type: 'number' },
-    { key: 'cost_total_krw', label: '총원가(₩)', type: 'number' },
-    { key: 'cost_total_usd', label: '총원가($)', type: 'number' },
+    { key: 'cost_total_krw', label: '총원가(₩) — 자동계산', type: 'computed', hint: '= 공급가총합 + DHL총운임 + 카드수수료 + 관세및수수료' },
+    { key: 'cost_total_usd', label: '총원가($) — 자동계산', type: 'computed', hint: '= 총원가(₩) ÷ 환율' },
     { key: 'target_revenue_usd', label: '목표매출($)', type: 'number', section: '④ 판매 실적', hint: '이 배치의 목표 매출 — 나중에 목표관리 탭 표에서도 바로 수정할 수 있습니다.' },
     { key: 'qty_online', label: '온라인 판매수량', type: 'number' },
     { key: 'qty_store', label: '직매장 판매수량', type: 'number' },
-    { key: 'qty_total', label: '총판매수량', type: 'number' },
+    { key: 'qty_total', label: '총판매수량 — 자동계산', type: 'computed', hint: '= 온라인 + 직매장 판매수량' },
     { key: 'revenue_online_usd', label: '온라인 매출($)', type: 'number' },
     { key: 'revenue_store_usd', label: '직매장 매출($)', type: 'number' },
-    { key: 'revenue_total_usd', label: '총매출($)', type: 'number' },
-    { key: 'revenue_total_krw', label: '총매출(₩)', type: 'number' },
-    { key: 'margin_rate', label: '마진율(0~1)', type: 'number', step: '0.01', hint: '0.3 = 30%처럼 소수로 입력' },
+    { key: 'revenue_total_usd', label: '총매출($) — 자동계산', type: 'computed', hint: '= 온라인 + 직매장 매출($)' },
+    { key: 'revenue_total_krw', label: '총매출(₩) — 자동계산', type: 'computed', hint: '= 총매출($) × 환율' },
+    { key: 'margin_rate', label: '마진율(0~1) — 자동계산', type: 'computed', hint: '= (총매출($) − 총원가($)) ÷ 총매출($)' },
     { key: 'cancel_count', label: '취소건', type: 'number', section: '⑤ 취소/클레임' },
     { key: 'cancel_note', label: '취소내용', type: 'textarea', wide: true },
     { key: 'claim_count', label: '클레임건', type: 'number' },
